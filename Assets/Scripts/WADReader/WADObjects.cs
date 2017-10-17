@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace WADReader
+namespace UnityWAD
 {
     // Classes to hold WAD file *metdata* 
     // We're not actually interested about the raw data at this level, just names and pointers

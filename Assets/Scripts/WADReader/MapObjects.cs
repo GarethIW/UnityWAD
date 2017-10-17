@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace WADReader
+namespace UnityWAD
 {
     // Structs to hold map data
     // As defined by: https://github.com/nukeop/TheUnofficialDoomSpecs/blob/master/Chapter4.md
