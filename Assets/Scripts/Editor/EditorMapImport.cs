@@ -18,6 +18,12 @@ namespace UnityWAD
             var generator = map.GetComponent<MapGenerator>();
             generator.Data = mapData;
 
+            // Get default diffuse for now
+            var mat = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Diffuse.mat");
+            generator.FloorMaterial = mat;
+            generator.CeilingMaterial = mat;
+            generator.WallsMaterial = mat;
+
             generator.GenerateMesh();
         }
     }

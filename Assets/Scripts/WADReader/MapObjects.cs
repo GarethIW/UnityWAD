@@ -8,7 +8,7 @@ namespace UnityWAD
     // Structs to hold map data
     // As defined by: https://github.com/nukeop/TheUnofficialDoomSpecs/blob/master/Chapter4.md
 
-    public struct MapLineDef
+    public class MapLineDef
     {
         public int From;
         public int To;
@@ -30,7 +30,7 @@ namespace UnityWAD
         }
     }
 
-    public struct MapSideDef
+    public class MapSideDef
     {
         public int XOffset;
         public int YOffset;
@@ -50,7 +50,7 @@ namespace UnityWAD
         }
     }
 
-    public struct MapSector
+    public class MapSector
     {
         public int FloorHeight;
         public int CeilingHeight;
@@ -72,7 +72,7 @@ namespace UnityWAD
         }
     }
 
-    public struct MapVertex
+    public class MapVertex
     {
         public int X;
         public int Y;
