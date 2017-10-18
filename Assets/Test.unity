@@ -330,7 +330,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ResultTexture: {fileID: 0}
-  WADFilename: C:/Users/gareth.MYCRMGROUP/Documents/Github/UnityWAD/DOOM2.wad
+  WADFilename: g:/code/UnityWAD/DOOM2.wad
   AvailableSprites: []
   TestSpriteIndex: 943
 --- !u!4 &727662450
