@@ -99,6 +99,14 @@ namespace UnityWAD
             return mapData;
         }
 
+        // Get a picture sprite: basically, anything that is not a floor or ceiling texture
+        public static SpriteData GetPictureSprite(FileStream wadStream, WADEntry spriteEntry)
+        {
+            var res = GetResource(wadStream, spriteEntry);
+
+            return new SpriteData(spriteEntry.Name, SpriteType.Picture, BitConverter.ToInt16(res,0), BitConverter.ToInt16(res, 2), BitConverter.ToInt16(res, 4), BitConverter.ToInt16(res, 6), res);
+        }
+
         private static int ReadInt(FileStream wadStream, int start, int length)
         {
             wadStream.Seek(start, SeekOrigin.Begin);

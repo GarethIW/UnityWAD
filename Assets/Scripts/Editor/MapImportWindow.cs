@@ -22,7 +22,7 @@ namespace UnityWAD
         List<WADMapEntry> availableMaps = new List<WADMapEntry>();
         private WADMapEntry selectedMap = null;
 
-        //private string fileName = "C:/Users/gareth.MYCRMGROUP/Documents/Github/UnityWAD/thing.wad";
+        //private string fileName = "C:/Users/gareth.MYCRMGROUP/Documents/Github/UnityWAD/DOOM2.wad";
         private string fileName = "G:/Code/UnityWAD/doom.wad";
         private int mapIndex;
 

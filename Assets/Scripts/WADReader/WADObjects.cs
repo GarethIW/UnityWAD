@@ -54,4 +54,6 @@ namespace UnityWAD
             return Name + "\n-----\n" + Things.ToString() + "\n" + LineDefs.ToString() + "\n" + SideDefs.ToString() + "\n" + Vertexes.ToString() + "\n" + Sectors.ToString();
         }
     }
+
+   
 }
