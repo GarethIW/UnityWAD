@@ -13,7 +13,10 @@ namespace UnityWAD
         public int DirectoryOffset;
 
         public List<WADEntry> Entries = new List<WADEntry>();
+        public Dictionary<string, WADEntry> EntryDictionary = new Dictionary<string, WADEntry>();
         public List<WADMapEntry> Maps = new List<WADMapEntry>();
+        public Dictionary<string,WallTextureData> WallTextures = new Dictionary<string,WallTextureData>();
+        public string[] PatchNames;
 
         public override string ToString()
         {

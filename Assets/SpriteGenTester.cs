@@ -51,8 +51,9 @@ public class SpriteGenTester : MonoBehaviour
     {
         using (var fs = new FileStream(WADFilename, FileMode.Open))
         {
+            var pal = WADReader.GetPalette(fs, 0);
             var sd = WADReader.GetPictureSprite(fs, SpriteEntries[TestSpriteIndex]);
-            ResultTexture = SpriteGenerator.GenerateSprite(sd);
+            ResultTexture = SpriteGenerator.GenerateSprite(sd, pal);
         }
     }
 }
