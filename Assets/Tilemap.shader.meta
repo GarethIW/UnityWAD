@@ -1,0 +1,11 @@
+fileFormatVersion: 2
+guid: d90c347b98ae8fd42bb5b0dc69647021
+timeCreated: 1508452605
+licenseType: Pro
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures:
+  - _TileMap: {fileID: 2800000, guid: ac16b2dac853fff4d915551ffcbdc780, type: 3}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

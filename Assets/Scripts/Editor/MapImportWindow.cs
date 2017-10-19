@@ -22,8 +22,8 @@ namespace UnityWAD
         List<WADMapEntry> availableMaps = new List<WADMapEntry>();
         private WADMapEntry selectedMap = null;
 
-        private string fileName = "C:/Users/gareth.MYCRMGROUP/Documents/Github/UnityWAD/DOOM2.wad";
-        //private string fileName = "G:/Code/UnityWAD/doom.wad";
+        //private string fileName = "C:/Users/gareth.MYCRMGROUP/Documents/Github/UnityWAD/DOOM2.wad";
+        private string fileName = "G:/Code/UnityWAD/doom.wad";
         private int mapIndex;
 
         public void Init()
@@ -113,6 +113,7 @@ namespace UnityWAD
 
                 var generator = map.GetComponent<MapGenerator>();
                 generator.Data = mapData;
+                generator.WallTiles = wallsSheet;
 
                 // Get default diffuse for now
                 var mat = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Diffuse.mat");

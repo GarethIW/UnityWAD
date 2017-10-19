@@ -27,7 +27,7 @@ namespace UnityWAD
                     }
 
                     Color32[] textureData = new Color32[spriteData.Width * spriteData.Height];
-                    var center = (spriteData.Width / 2);
+                    var center = (spriteData.Width / 2)-1;
 
                     for(int x=0;x<columns.Count;x++)
                     {
@@ -42,7 +42,7 @@ namespace UnityWAD
                             {
                                 // TODO: Colours!
                                 //Debug.Log(spriteData.XOffset + x + "," + ((spriteData.Height - spriteData.YOffset) + row + i) + "=" + (spriteData.XOffset + x + ((((spriteData.Height-1) - spriteData.YOffset) + row + i) * spriteData.Width)) + "/" + textureData.Length);
-                                var xy = (center - spriteData.XOffset) + x + (((spriteData.YOffset) - row - (i-5)) * spriteData.Width);
+                                var xy = (center - spriteData.XOffset) + x + (((spriteData.YOffset) - row - (i-4)) * spriteData.Width);
                                 if (xy < textureData.Length && xy >= 0)
                                     textureData[xy] = paletteData.Colors[spriteData.Data[postPos]];
                                 postPos++;
@@ -106,6 +106,10 @@ namespace UnityWAD
                 //Debug.Log(sl + "," + st + "," + dl +"," + dt + "," + w + "," + h);
                 var data = sprite.GetPixels(sl,st,w,h);
                 spriteTexture.SetPixels(dl,dt,w,h,data);
+                //for (int x = dl; x < dl + w; x++)
+                 //   for (int y = dt; y < dt + h; y++)
+                 //       if (x == dl || x == dl + w - 1 || y == dt || y == dt + h -1)
+                //            spriteTexture.SetPixel(x, y, Color.red);
             }
 
             spriteTexture.Apply();
@@ -113,7 +117,7 @@ namespace UnityWAD
             return spriteTexture;
         }
 
-        public static SpriteSheet GenerateWallTextureSheet(List<WallTextureData> textureList, Dictionary<string, SpriteData> patches, PaletteData paletteData)
+        public static TileSheet GenerateWallTextureSheet(List<WallTextureData> textureList, Dictionary<string, SpriteData> patches, PaletteData paletteData)
         {
             var widest = 0;
             var tallest = 0;
@@ -124,13 +128,19 @@ namespace UnityWAD
                 if (t.Height > tallest) tallest = t.Height;
             }
 
+            var largest = widest > tallest ? widest : tallest;
+
             var rowCount = Mathf.CeilToInt(Mathf.Sqrt(textureList.Count));
-            var w = rowCount * widest;
-            var h = rowCount * tallest;
+            var w = rowCount * largest;
+            var h = rowCount * largest;
 
-            Debug.Log(textureList.Count + "," + rowCount + "," + widest + "," + tallest);
+            //Debug.Log(textureList.Count + "," + rowCount + "," + widest + "," + tallest);
 
-            var spriteSheet = new SpriteSheet();
+            var spriteSheet = new TileSheet();
+            spriteSheet.Rows = rowCount;
+            spriteSheet.Columns = rowCount;
+            spriteSheet.TileWidth = largest;
+            spriteSheet.TileHeight = largest;
             spriteSheet.Texture = new Texture2D(w, h);
 
             int index = 0;
@@ -138,11 +148,18 @@ namespace UnityWAD
             {
                 var tex = GenerateWallTexture(t, patches, paletteData);
 
-                var destX = widest * (index % rowCount);
-                var desty = tallest * (index / rowCount);
+                var destX = largest * (index % rowCount);
+                var desty = largest * (index / rowCount);
 
                 var source = tex.GetPixels();
                 spriteSheet.Texture.SetPixels(destX, desty, tex.width, tex.height, source);
+
+                spriteSheet.LookupTable.Add(t.Name, new TileSheetSprite()
+                {
+                    TileNum = index,
+                    Width = tex.width,
+                    Height = tex.height
+                });
 
                 index++;
             }
@@ -152,7 +169,7 @@ namespace UnityWAD
             return spriteSheet;
         }
 
-        public static SpriteSheet GenerateSpriteSheet(List<SpriteData> spritesList, PaletteData paletteData)
+        public static TileSheet GenerateTileSheet(List<SpriteData> spritesList, PaletteData paletteData)
         {
             var widest = 0;
             var tallest = 0;
@@ -167,8 +184,12 @@ namespace UnityWAD
             var w = rowCount * widest;
             var h = rowCount * tallest;
 
-            var spriteSheet = new SpriteSheet();
+            var spriteSheet = new TileSheet();
             spriteSheet.Texture = new Texture2D(w, h);
+            spriteSheet.Rows = rowCount;
+            spriteSheet.Columns = rowCount;
+            spriteSheet.TileWidth = widest;
+            spriteSheet.TileHeight = tallest;
 
             int index = 0;
             foreach (var s in spritesList)
@@ -180,6 +201,13 @@ namespace UnityWAD
 
                 var source = tex.GetPixels();
                 spriteSheet.Texture.SetPixels(destX,desty,tex.width,tex.height, source);
+
+                spriteSheet.LookupTable.Add(s.Name, new TileSheetSprite()
+                {
+                    TileNum = index,
+                    Width = tex.width,
+                    Height = tex.height
+                });
 
                 index++;
             }

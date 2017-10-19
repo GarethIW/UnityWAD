@@ -12,6 +12,8 @@ namespace UnityWAD
         public MapData Data;
         public float Scale = 0.015f;
 
+        public TileSheet WallTiles;
+
         public Material FloorMaterial;
         public Material CeilingMaterial;
         public Material WallsMaterial;
@@ -22,6 +24,8 @@ namespace UnityWAD
             if (Data == null) return;
 
             var wallVertices = new VertexList();
+            var wallUVs = new List<Vector4>();
+            var wallUV1s = new List<Vector4>();
             var wallIndices = new List<int>();
 
             wallVertices.Mode = VertexList.VertexListMode.PerFace;
@@ -42,6 +46,18 @@ namespace UnityWAD
                     var br = wallVertices.Add(new Vector3(Data.Vertexes[line.To].X, rightSector.FloorHeight, Data.Vertexes[line.To].Y) * Scale);
 
                     wallIndices.AddRange(new[] { tr,br,tl,br,bl,tl });
+
+                    var tileNum = WallTiles.LookupTable[rightSide.FullTexture].TileNum;
+                    var w = 1f;//(1f / (float)WallTiles.TileWidth) * (float)WallTiles.LookupTable[rightSide.FullTexture].Width;
+                    var h = 1f;//(1f / (float)WallTiles.TileHeight) * (float)WallTiles.LookupTable[rightSide.FullTexture].Height;
+                    var tw = WallTiles.LookupTable[rightSide.FullTexture].Width;
+                    var th = WallTiles.LookupTable[rightSide.FullTexture].Height;
+                    wallUVs.Add(new Vector4(0f, h, tileNum, 0f));
+                    wallUVs.Add(new Vector4(w, h, tileNum, 0f));
+                    wallUVs.Add(new Vector4(0f, 0f, tileNum, 0f));
+                    wallUVs.Add(new Vector4(w, 0f, tileNum, 0f));
+
+                    for (var i = 0; i < 4; i++) wallUV1s.Add(new Vector4(tw,th,rightSide.XOffset,rightSide.YOffset));
                 }
                 if (!rightSide.UpperTexture.StartsWith("-") && leftSector!=null)
                 {
@@ -51,6 +67,18 @@ namespace UnityWAD
                     var br = wallVertices.Add(new Vector3(Data.Vertexes[line.To].X, leftSector.CeilingHeight, Data.Vertexes[line.To].Y) * Scale);
 
                     wallIndices.AddRange(new[] { tr, br, tl, br, bl, tl });
+
+                    var tileNum = WallTiles.LookupTable[rightSide.UpperTexture].TileNum;
+                    var w = 1f;//(1f / (float)WallTiles.TileWidth) * (float)WallTiles.LookupTable[rightSide.UpperTexture].Width;
+                    var h = 1f;//(1f / (float)WallTiles.TileHeight) * (float)WallTiles.LookupTable[rightSide.UpperTexture].Height;
+                    var tw = WallTiles.LookupTable[rightSide.UpperTexture].Width;
+                    var th = WallTiles.LookupTable[rightSide.UpperTexture].Height;
+                    wallUVs.Add(new Vector4(0f, h, tileNum, 0f));
+                    wallUVs.Add(new Vector4(w, h, tileNum, 0f));
+                    wallUVs.Add(new Vector4(0f, 0f, tileNum, 0f));
+                    wallUVs.Add(new Vector4(w, 0f, tileNum, 0f));
+
+                    for (var i = 0; i < 4; i++) wallUV1s.Add(new Vector4(tw, th, rightSide.XOffset, rightSide.YOffset));
                 }
                 if (!rightSide.LowerTexture.StartsWith("-") && leftSector != null)
                 {
@@ -60,6 +88,18 @@ namespace UnityWAD
                     var br = wallVertices.Add(new Vector3(Data.Vertexes[line.To].X, rightSector.FloorHeight, Data.Vertexes[line.To].Y) * Scale);
 
                     wallIndices.AddRange(new[] { tr, br, tl, br, bl, tl });
+
+                    var tileNum = WallTiles.LookupTable[rightSide.LowerTexture].TileNum;
+                    var w = 1f;//(1f / (float)WallTiles.TileWidth) * (float)WallTiles.LookupTable[rightSide.LowerTexture].Width;
+                    var h = 1f;//(1f / (float)WallTiles.TileHeight) * (float)WallTiles.LookupTable[rightSide.LowerTexture].Height;
+                    var tw = WallTiles.LookupTable[rightSide.LowerTexture].Width;
+                    var th = WallTiles.LookupTable[rightSide.LowerTexture].Height;
+                    wallUVs.Add(new Vector4(0f, h, tileNum, 0f));
+                    wallUVs.Add(new Vector4(w, h, tileNum, 0f));
+                    wallUVs.Add(new Vector4(0f, 0f, tileNum, 0f));
+                    wallUVs.Add(new Vector4(w, 0f, tileNum, 0f));
+
+                    for (var i = 0; i < 4; i++) wallUV1s.Add(new Vector4(tw, th, rightSide.XOffset, rightSide.YOffset));
                 }
 
                 if (leftSide != null)
@@ -71,7 +111,19 @@ namespace UnityWAD
                         var bl = wallVertices.Add(new Vector3(Data.Vertexes[line.From].X, leftSector.FloorHeight, Data.Vertexes[line.From].Y) * Scale);
                         var br = wallVertices.Add(new Vector3(Data.Vertexes[line.To].X, leftSector.FloorHeight, Data.Vertexes[line.To].Y) * Scale);
 
-                        wallIndices.AddRange(new[] { tl,bl,br,tl,br,tr });
+                        wallIndices.AddRange(new[] { tl, bl, br, tl, br, tr });
+
+                        var tileNum = WallTiles.LookupTable[leftSide.FullTexture].TileNum;
+                        var w = 1f;//(1f / (float)WallTiles.TileWidth) * (float)WallTiles.LookupTable[leftSide.FullTexture].Width;
+                        var h = 1f;//(1f / (float)WallTiles.TileHeight) * (float)WallTiles.LookupTable[leftSide.FullTexture].Height;
+                        var tw = WallTiles.LookupTable[leftSide.FullTexture].Width;
+                        var th = WallTiles.LookupTable[leftSide.FullTexture].Height;
+                        wallUVs.Add(new Vector4(0f, h, tileNum, 0f));
+                        wallUVs.Add(new Vector4(w, h, tileNum, 0f));
+                        wallUVs.Add(new Vector4(0f, 0f, tileNum, 0f));
+                        wallUVs.Add(new Vector4(w, 0f, tileNum, 0f));
+
+                        for (var i = 0; i < 4; i++) wallUV1s.Add(new Vector4(tw, th, leftSide.XOffset, leftSide.YOffset));
                     }
                     if (!leftSide.UpperTexture.StartsWith("-") && leftSector != null)
                     {
@@ -81,6 +133,19 @@ namespace UnityWAD
                         var br = wallVertices.Add(new Vector3(Data.Vertexes[line.To].X, rightSector.CeilingHeight, Data.Vertexes[line.To].Y) * Scale);
 
                         wallIndices.AddRange(new[] { tl, bl, br, tl, br, tr });
+
+                        var tileNum = WallTiles.LookupTable[leftSide.UpperTexture].TileNum;
+                        var w = 1f;//(1f / (float)WallTiles.TileWidth) * (float)WallTiles.LookupTable[leftSide.UpperTexture].Width;
+                        var h = 1f;//(1f / (float)WallTiles.TileHeight) * (float)WallTiles.LookupTable[leftSide.UpperTexture].Height;
+                        var tw = WallTiles.LookupTable[leftSide.UpperTexture].Width;
+                        var th = WallTiles.LookupTable[leftSide.UpperTexture].Height;
+                        wallUVs.Add(new Vector4(0f, h, tileNum, 0f));
+                        wallUVs.Add(new Vector4(w, h, tileNum, 0f));
+                        wallUVs.Add(new Vector4(0f, 0f, tileNum, 0f));
+                        wallUVs.Add(new Vector4(w, 0f, tileNum, 0f));
+
+                        for (var i = 0; i < 4; i++) wallUV1s.Add(new Vector4(tw, th, leftSide.XOffset, leftSide.YOffset));
+
                     }
                     if (!leftSide.LowerTexture.StartsWith("-") && leftSector != null)
                     {
@@ -90,6 +155,19 @@ namespace UnityWAD
                         var br = wallVertices.Add(new Vector3(Data.Vertexes[line.To].X, leftSector.FloorHeight, Data.Vertexes[line.To].Y) * Scale);
 
                         wallIndices.AddRange(new[] { tl, bl, br, tl, br, tr });
+
+                        var tileNum = WallTiles.LookupTable[leftSide.LowerTexture].TileNum;
+                        var w = 1f;//(1f / (float)WallTiles.TileWidth) * (float)WallTiles.LookupTable[leftSide.LowerTexture].Width;
+                        var h = 1f;//(1f / (float)WallTiles.TileHeight) * (float)WallTiles.LookupTable[leftSide.LowerTexture].Height;
+                        var tw = WallTiles.LookupTable[leftSide.LowerTexture].Width;
+                        var th = WallTiles.LookupTable[leftSide.LowerTexture].Height;
+                        wallUVs.Add(new Vector4(0f, h, tileNum, 0f));
+                        wallUVs.Add(new Vector4(w, h, tileNum, 0f));
+                        wallUVs.Add(new Vector4(0f, 0f, tileNum, 0f));
+                        wallUVs.Add(new Vector4(w, 0f, tileNum, 0f));
+
+                        for (var i = 0; i < 4; i++) wallUV1s.Add(new Vector4(tw, th, leftSide.XOffset, leftSide.YOffset));
+
                     }
                 }
             }
@@ -99,6 +177,8 @@ namespace UnityWAD
                 vertices = wallVertices.ToArray(),
             };
             wallsMesh.SetIndices(wallIndices.ToArray(), MeshTopology.Triangles, 0);
+            wallsMesh.SetUVs(0, wallUVs);
+            wallsMesh.SetUVs(1, wallUV1s);
             wallsMesh.RecalculateNormals();
             wallsMesh.RecalculateBounds();
 
