@@ -74,6 +74,8 @@ Material:
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
+    - _TileHeight: 256
+    - _TileWidth: 256
     - _UVSec: 0
     - _XTiles: 6
     - _YTiles: 6
