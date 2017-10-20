@@ -14,7 +14,7 @@ namespace UnityWAD
             PerFace
         }
 
-        public VertexListMode Mode = VertexListMode.Shared;
+        public VertexListMode Mode = VertexListMode.PerFace;
         public List<Vector3> Vertices = new List<Vector3>();
 
         public int Add(Vector3 newVert)

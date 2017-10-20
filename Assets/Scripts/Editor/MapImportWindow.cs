@@ -20,10 +20,9 @@ namespace UnityWAD
     {
         private WADInfo loadedWad = null;
         List<WADMapEntry> availableMaps = new List<WADMapEntry>();
-        private WADMapEntry selectedMap = null;
 
-        //private string fileName = "C:/Users/gareth.MYCRMGROUP/Documents/Github/UnityWAD/DOOM2.wad";
-        private string fileName = "G:/Code/UnityWAD/doom.wad";
+        private string fileName = "C:/Users/gareth.MYCRMGROUP/Documents/Github/UnityWAD/DOOM.wad";
+        //private string fileName = "G:/Code/UnityWAD/doom.wad";
         private int mapIndex;
 
         public void Init()
@@ -90,7 +89,7 @@ namespace UnityWAD
                 // Get wad palette
                 var paletteData = WADReader.GetPalette(wadStream, 0);
 
-                // Get texture resources
+                // Get tilesheets
                 var texList = new List<WallTextureData>();
                 var patchDict = new Dictionary<string, SpriteData>();
                 foreach (var tex in mapData.WallsUsed)
@@ -102,24 +101,42 @@ namespace UnityWAD
                 }
                 var wallsSheet = SpriteGenerator.GenerateWallTextureSheet(texList, patchDict, paletteData);
 
-                // Let's save walls as a PNG
-                byte[] bytes = wallsSheet.Texture.EncodeToPNG();
-                File.WriteAllBytes(Path.Combine(Application.dataPath,  mapData.Name + "-walls.png"), bytes);
+                // Get our shader
+                var wallShader = Shader.Find("UnityWAD/Tilemap");
 
-                var map = new GameObject();
-                map.name = mapData.Name;
-                map.AddComponent<MapGenerator>();
+                // Let's save walls as a PNG and create an asset
+                byte[] bytes = wallsSheet.Texture.EncodeToPNG();
+                File.WriteAllBytes(Path.Combine(Application.dataPath, mapData.Name + "-walls.png"), bytes);
+                AssetDatabase.ImportAsset("Assets/" + mapData.Name + "-walls.png", ImportAssetOptions.ForceUpdate);
+                var importer = (TextureImporter)AssetImporter.GetAtPath("Assets/" + mapData.Name + "-walls.png");
+                importer.filterMode = FilterMode.Point;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.textureCompression = TextureImporterCompression.Uncompressed;
+                importer.npotScale = TextureImporterNPOTScale.None;
+                importer.SaveAndReimport();
+                var wallsAsset = (Texture2D) AssetDatabase.LoadAssetAtPath("Assets/"+ mapData.Name + "-walls.png", typeof(Texture2D));
+
+                // Create materials
+                var wallMat = new Material(wallShader);
+                wallMat.SetTexture("_TileMap", wallsAsset);
+                wallMat.SetInt("_XTiles", wallsSheet.Columns);
+                wallMat.SetInt("_YTiles", wallsSheet.Rows);
+                wallMat.SetInt("_TileWidth", wallsSheet.TileWidth);
+                wallMat.SetInt("_TileHeight", wallsSheet.TileHeight);
+                AssetDatabase.CreateAsset(wallMat, "Assets/" + mapData.Name + "-walls.mat");
+
+
+                AssetDatabase.SaveAssets();
+
+                // Create map parent gameobject
+                var map = new GameObject(mapData.Name);
                 map.transform.position = Vector3.zero;
 
-                var generator = map.GetComponent<MapGenerator>();
+                // Initialise the MapGenerator component and feed in tilesheets and materials
+                var generator = map.AddComponent<MapGenerator>();
                 generator.Data = mapData;
                 generator.WallTiles = wallsSheet;
-
-                // Get default diffuse for now
-                var mat = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Diffuse.mat");
-                generator.FloorMaterial = mat;
-                generator.CeilingMaterial = mat;
-                generator.WallsMaterial = mat;
+                generator.WallsMaterial = wallMat;
 
                 generator.GenerateMesh();
             }
