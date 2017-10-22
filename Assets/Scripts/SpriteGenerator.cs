@@ -14,6 +14,7 @@ namespace UnityWAD
         public static Texture2D GenerateSprite(SpriteData spriteData, PaletteData paletteData)
         {
             Texture2D spriteTexture = null;
+            Color32[] textureData;
 
             switch (spriteData.Type)
             {
@@ -26,7 +27,7 @@ namespace UnityWAD
                         pos += 4;
                     }
 
-                    Color32[] textureData = new Color32[spriteData.Width * spriteData.Height];
+                    textureData = new Color32[spriteData.Width * spriteData.Height];
                     var center = (spriteData.Width / 2)-1;
 
                     for(int x=0;x<columns.Count;x++)
@@ -57,6 +58,24 @@ namespace UnityWAD
 
                     break;
                 case SpriteType.Raw:
+                    // Raw sprites are always 64x64
+                    spriteTexture = new Texture2D(spriteData.Width, spriteData.Height);
+                    if (spriteData.Data.Length == 0)
+                        return new Texture2D(spriteData.Width, spriteData.Height);
+
+                    textureData = new Color32[spriteData.Width * spriteData.Height];
+                    var dataPos = 0;
+                    for (var x=0;x< spriteData.Width; x++)
+                        for (var y = spriteData.Height-1; y >=0; y--)
+                        {
+                            var xy = x + (y * spriteData.Width);
+                            textureData[xy] = paletteData.Colors[spriteData.Data[dataPos]];
+                            dataPos++;
+                        }
+
+                    spriteTexture.SetPixels32(textureData);
+                    spriteTexture.Apply();
+
                     break;
             }
 
@@ -117,7 +136,7 @@ namespace UnityWAD
             return spriteTexture;
         }
 
-        public static TileSheet GenerateWallTextureSheet(List<WallTextureData> textureList, Dictionary<string, SpriteData> patches, PaletteData paletteData)
+        public static TileSheet GenerateWallTextureSheet(List<WallTextureData> textureList, Dictionary<string, SpriteData> patches, PaletteData paletteData, int padding)
         {
             var widest = 0;
             var tallest = 0;
@@ -134,13 +153,17 @@ namespace UnityWAD
             var w = rowCount * largest;
             var h = rowCount * largest;
 
-            //Debug.Log(textureList.Count + "," + rowCount + "," + widest + "," + tallest);
+            w += rowCount * padding * 2;
+            h += rowCount * padding * 2;
+
+            if (rowCount % 2 != 0) rowCount++;
 
             var spriteSheet = new TileSheet();
             spriteSheet.Rows = rowCount;
             spriteSheet.Columns = rowCount;
             spriteSheet.TileWidth = largest;
             spriteSheet.TileHeight = largest;
+            spriteSheet.Padding = padding;
             spriteSheet.Texture = new Texture2D(w, h);
 
             int index = 0;
@@ -148,11 +171,37 @@ namespace UnityWAD
             {
                 var tex = GenerateWallTexture(t, patches, paletteData);
 
-                var destX = largest * (index % rowCount);
-                var desty = largest * (index / rowCount);
+                var destX = (largest + padding*2) * (index % rowCount) + padding;
+                var destY = (largest + padding*2) * (index / rowCount) + padding;
 
                 var source = tex.GetPixels();
-                spriteSheet.Texture.SetPixels(destX, desty, tex.width, tex.height, source);
+                spriteSheet.Texture.SetPixels(destX, destY, tex.width, tex.height, source);
+
+                // Padding
+                for(var i=1;i<=padding;i++)
+                {
+                    for(var x=0;x<tex.width;x++)
+                    {
+                        spriteSheet.Texture.SetPixel(destX+x, destY - i, tex.GetPixel(x, 0));
+                        spriteSheet.Texture.SetPixel(destX+x, (destY + (tex.height-1)) + i, tex.GetPixel(x, tex.height-1));
+                    }
+
+                    for (var y =0; y < tex.height; y++)
+                    {
+                        spriteSheet.Texture.SetPixel(destX - i, (destY)+y, tex.GetPixel(0, y));
+                        spriteSheet.Texture.SetPixel((destX + (tex.width-1)) + i, (destY)+y, tex.GetPixel(tex.width-1, y));
+                    }
+                }
+
+                for(var x=0;x<padding;x++)
+                    for(var y=0;y<padding;y++)
+                    {
+                        spriteSheet.Texture.SetPixel((destX-padding)+x, (destY-2)+y, tex.GetPixel(0, 0));
+                        spriteSheet.Texture.SetPixel((destX+tex.width)+x, (destY-2)+y, tex.GetPixel(tex.width-1, 0));
+                        spriteSheet.Texture.SetPixel((destX+tex.width)+x, (destY+tex.height)+y, tex.GetPixel(tex.width-1, tex.height-1));
+                        spriteSheet.Texture.SetPixel((destX - padding) + x, (destY + tex.height) + y, tex.GetPixel(0, tex.height - 1));
+                    }
+
 
                 spriteSheet.LookupTable.Add(t.Name, new TileSheetSprite()
                 {
@@ -169,7 +218,7 @@ namespace UnityWAD
             return spriteSheet;
         }
 
-        public static TileSheet GenerateTileSheet(List<SpriteData> spritesList, PaletteData paletteData)
+        public static TileSheet GenerateTileSheet(List<SpriteData> spritesList, PaletteData paletteData, int padding)
         {
             var widest = 0;
             var tallest = 0;
@@ -180,9 +229,15 @@ namespace UnityWAD
                 if (s.Height > tallest) tallest = s.Height;
             }
 
+            // Calculate number of rows and columns. We need this to be an even number for the shader to work
             var rowCount = Mathf.CeilToInt(Mathf.Sqrt(spritesList.Count));
+            if (rowCount % 2 != 0) rowCount++;
+
             var w = rowCount * widest;
             var h = rowCount * tallest;
+
+            w += rowCount * padding * 2;
+            h += rowCount * padding * 2;
 
             var spriteSheet = new TileSheet();
             spriteSheet.Texture = new Texture2D(w, h);
@@ -190,17 +245,43 @@ namespace UnityWAD
             spriteSheet.Columns = rowCount;
             spriteSheet.TileWidth = widest;
             spriteSheet.TileHeight = tallest;
+            spriteSheet.Padding = padding;
 
             int index = 0;
             foreach (var s in spritesList)
             {
                 var tex = GenerateSprite(s, paletteData);
 
-                var destX = widest * (index % rowCount);
-                var desty = tallest * (index / rowCount);
+                var destX = (widest + padding*2) * (index % rowCount) + padding;
+                var destY = (tallest+padding*2) * (index / rowCount) + padding;
 
                 var source = tex.GetPixels();
-                spriteSheet.Texture.SetPixels(destX,desty,tex.width,tex.height, source);
+                spriteSheet.Texture.SetPixels(destX,destY,tex.width,tex.height, source);
+
+                // Padding
+                for (var i = 1; i <= padding; i++)
+                {
+                    for (var x = 0; x < tex.width; x++)
+                    {
+                        spriteSheet.Texture.SetPixel(destX + x, destY - i, tex.GetPixel(x, 0));
+                        spriteSheet.Texture.SetPixel(destX + x, (destY + (tex.height - 1)) + i, tex.GetPixel(x, tex.height - 1));
+                    }
+
+                    for (var y = 0; y < tex.height; y++)
+                    {
+                        spriteSheet.Texture.SetPixel(destX - i, (destY) + y, tex.GetPixel(0, y));
+                        spriteSheet.Texture.SetPixel((destX + (tex.width - 1)) + i, (destY) + y, tex.GetPixel(tex.width - 1, y));
+                    }
+                }
+
+                for (var x = 0; x < padding; x++)
+                    for (var y = 0; y < padding; y++)
+                    {
+                        spriteSheet.Texture.SetPixel((destX - padding) + x, (destY - 2) + y, tex.GetPixel(0, 0));
+                        spriteSheet.Texture.SetPixel((destX + tex.width) + x, (destY - 2) + y, tex.GetPixel(tex.width - 1, 0));
+                        spriteSheet.Texture.SetPixel((destX + tex.width) + x, (destY + tex.height) + y, tex.GetPixel(tex.width - 1, tex.height - 1));
+                        spriteSheet.Texture.SetPixel((destX - padding) + x, (destY + tex.height) + y, tex.GetPixel(0, tex.height - 1));
+                    }
 
                 spriteSheet.LookupTable.Add(s.Name, new TileSheetSprite()
                 {

@@ -67,8 +67,11 @@ namespace UnityWAD
                                            BitConverter.ToInt16(sectorData, pos + 22),
                                            BitConverter.ToInt16(sectorData, pos + 24));
 
-                //if(Sectors[i].CeilingTexture!="-" && !FlatsUsed.Contains(wadInfo.EntryDictionary[Sectors[i].CeilingTexture])) FlatsUsed.Add(wadInfo.EntryDictionary[Sectors[i].CeilingTexture]);
-                //if(Sectors[i].FloorTexture!="-" && !FlatsUsed.Contains(wadInfo.EntryDictionary[Sectors[i].FloorTexture])) FlatsUsed.Add(wadInfo.EntryDictionary[Sectors[i].FloorTexture]);
+                //Debug.Log(Sectors[i].CeilingTexture);
+                var cname = Sectors[i].CeilingTexture.Replace("\0", "");
+                if (Sectors[i].CeilingTexture!="-" && wadInfo.EntryDictionary.ContainsKey(cname) && !FlatsUsed.Contains(wadInfo.EntryDictionary[cname])) FlatsUsed.Add(wadInfo.EntryDictionary[cname]);
+                var fname = Sectors[i].FloorTexture.Replace("\0", "");
+                if (Sectors[i].FloorTexture!= "-" && wadInfo.EntryDictionary.ContainsKey(fname) && !FlatsUsed.Contains(wadInfo.EntryDictionary[fname])) FlatsUsed.Add(wadInfo.EntryDictionary[fname]);
 
                 pos += 26;
             }

@@ -21,8 +21,8 @@ namespace UnityWAD
         private WADInfo loadedWad = null;
         List<WADMapEntry> availableMaps = new List<WADMapEntry>();
 
-        private string fileName = "C:/Users/gareth.MYCRMGROUP/Documents/Github/UnityWAD/DOOM.wad";
-        //private string fileName = "G:/Code/UnityWAD/doom.wad";
+        //private string fileName = "C:/Users/gareth.MYCRMGROUP/Documents/Github/UnityWAD/DOOM.wad";
+        private string fileName = "G:/Code/UnityWAD/doom.wad";
         private int mapIndex;
 
         public void Init()
@@ -90,6 +90,7 @@ namespace UnityWAD
                 var paletteData = WADReader.GetPalette(wadStream, 0);
 
                 // Get tilesheets
+                // Walls
                 var texList = new List<WallTextureData>();
                 var patchDict = new Dictionary<string, SpriteData>();
                 foreach (var tex in mapData.WallsUsed)
@@ -99,10 +100,14 @@ namespace UnityWAD
                     foreach(var kvp in patches)
                         if(!patchDict.ContainsKey(kvp.Key)) patchDict.Add(kvp.Key, kvp.Value);
                 }
-                var wallsSheet = SpriteGenerator.GenerateWallTextureSheet(texList, patchDict, paletteData);
+                var wallsSheet = SpriteGenerator.GenerateWallTextureSheet(texList, patchDict, paletteData,0);
+                // Flats
+                var floorSprites = WADReader.GetRawSprites(wadStream, mapData.FlatsUsed);
+                var flatsSheet = SpriteGenerator.GenerateTileSheet(floorSprites, paletteData,0);
 
-                // Get our shader
-                var wallShader = Shader.Find("UnityWAD/Tilemap");
+                // Get our shaders
+                var wallShader = Shader.Find("UnityWAD/DoomWalls");
+                var flatShader = Shader.Find("UnityWAD/DoomFlats");
 
                 // Let's save walls as a PNG and create an asset
                 byte[] bytes = wallsSheet.Texture.EncodeToPNG();
@@ -113,8 +118,22 @@ namespace UnityWAD
                 importer.wrapMode = TextureWrapMode.Clamp;
                 importer.textureCompression = TextureImporterCompression.Uncompressed;
                 importer.npotScale = TextureImporterNPOTScale.None;
+                importer.mipmapEnabled = false;
                 importer.SaveAndReimport();
                 var wallsAsset = (Texture2D) AssetDatabase.LoadAssetAtPath("Assets/"+ mapData.Name + "-walls.png", typeof(Texture2D));
+
+                // Now save the flats
+                bytes = flatsSheet.Texture.EncodeToPNG();
+                File.WriteAllBytes(Path.Combine(Application.dataPath, mapData.Name + "-flats.png"), bytes);
+                AssetDatabase.ImportAsset("Assets/" + mapData.Name + "-flats.png", ImportAssetOptions.ForceUpdate);
+                importer = (TextureImporter)AssetImporter.GetAtPath("Assets/" + mapData.Name + "-flats.png");
+                importer.filterMode = FilterMode.Point;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.textureCompression = TextureImporterCompression.Uncompressed;
+                importer.npotScale = TextureImporterNPOTScale.None;
+                importer.mipmapEnabled = false;
+                importer.SaveAndReimport();
+                var flatsAsset = (Texture2D)AssetDatabase.LoadAssetAtPath("Assets/" + mapData.Name + "-flats.png", typeof(Texture2D));
 
                 // Create materials
                 var wallMat = new Material(wallShader);
@@ -123,8 +142,17 @@ namespace UnityWAD
                 wallMat.SetInt("_YTiles", wallsSheet.Rows);
                 wallMat.SetInt("_TileWidth", wallsSheet.TileWidth);
                 wallMat.SetInt("_TileHeight", wallsSheet.TileHeight);
+                wallMat.SetInt("_Padding", wallsSheet.Padding);
                 AssetDatabase.CreateAsset(wallMat, "Assets/" + mapData.Name + "-walls.mat");
 
+                var flatsMat = new Material(flatShader);
+                flatsMat.SetTexture("_TileMap", flatsAsset);
+                flatsMat.SetInt("_XTiles", flatsSheet.Columns);
+                flatsMat.SetInt("_YTiles", flatsSheet.Rows);
+                flatsMat.SetInt("_TileWidth", flatsSheet.TileWidth);
+                flatsMat.SetInt("_TileHeight", flatsSheet.TileHeight);
+                flatsMat.SetInt("_Padding", flatsSheet.Padding);
+                AssetDatabase.CreateAsset(flatsMat, "Assets/" + mapData.Name + "-flats.mat");
 
                 AssetDatabase.SaveAssets();
 
@@ -136,7 +164,9 @@ namespace UnityWAD
                 var generator = map.AddComponent<MapGenerator>();
                 generator.Data = mapData;
                 generator.WallTiles = wallsSheet;
+                generator.FlatTiles = flatsSheet;
                 generator.WallsMaterial = wallMat;
+                generator.FlatsMaterial = flatsMat;
 
                 generator.GenerateMesh();
             }

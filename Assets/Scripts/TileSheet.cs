@@ -18,6 +18,9 @@ namespace UnityWAD
         public int Rows;
         public int Columns;
 
+        // Padding
+        public int Padding;
+
         // Lookup table maps sprite names to sprite index/width/height in sheet
         public Dictionary<string, TileSheetSprite> LookupTable = new Dictionary<string, TileSheetSprite>();
     }

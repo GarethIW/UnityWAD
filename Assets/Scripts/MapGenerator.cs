@@ -4,30 +4,40 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityWAD;
+using Triangulator;
 
 namespace UnityWAD
 {
     public class MapGenerator : MonoBehaviour
     {
         public MapData Data;
-        public float Scale = 0.015f;
         public Vector2 Grid = new Vector2(64f,64f); // Line length of one map grid unit, used to calculate uv scaling
 
-        public TileSheet WallTiles;
+        public float Scale = 0.015625f;
 
-        public Material FloorMaterial;
-        public Material CeilingMaterial;
+        public TileSheet WallTiles;
+        public TileSheet FlatTiles;
+
         public Material WallsMaterial;
+        public Material FlatsMaterial;
 
 
         public void GenerateMesh()
         {
+            for (int i = transform.childCount - 1; i >= 0; i--)
+                DestroyImmediate(transform.GetChild(i).gameObject);
+
             if (Data == null) return;
+
+            Scale = 1f / Grid.x;
 
             var wallVertices = new Dictionary<int,VertexList>();
             var wallUVs = new Dictionary<int, List<Vector4>>();
             var wallUV1s = new Dictionary<int, List<Vector4>>();
             var wallIndices = new Dictionary<int, List<int>>();
+
+            var sectorLines = new Dictionary<int, List<MapLineDef>>();
+
 
             for (var i = 0; i < Data.Sectors.Length; i++)
             {
@@ -35,7 +45,10 @@ namespace UnityWAD
                 wallUVs.Add(i, new List<Vector4>());
                 wallUV1s.Add(i, new List<Vector4>());
                 wallIndices.Add(i, new List<int>());
+
+                sectorLines.Add(i, new List<MapLineDef>());
             }
+
 
             foreach (var line in Data.LineDefs)
             {
@@ -44,6 +57,10 @@ namespace UnityWAD
 
                 var rightSector = Data.Sectors[rightSide.Sector];
                 var leftSector = leftSide!=null ? Data.Sectors[leftSide.Sector] : null;
+
+                sectorLines[rightSide.Sector].Add(line);
+                if(leftSide!=null)
+                    sectorLines[leftSide.Sector].Add(line);
 
                 var widthRatio = (1f/Grid.x) * Vector2.Distance(new Vector2(Data.Vertexes[line.From].X, Data.Vertexes[line.From].Y), new Vector2(Data.Vertexes[line.To].X, Data.Vertexes[line.To].Y));
 
@@ -59,10 +76,10 @@ namespace UnityWAD
                     var tileNum = WallTiles.LookupTable[rightSide.FullTexture].TileNum;
                     var tw = WallTiles.LookupTable[rightSide.FullTexture].Width;
                     var th = WallTiles.LookupTable[rightSide.FullTexture].Height;
-                    wallUVs[rightSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
-                    wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
                     wallUVs[rightSide.Sector].Add(new Vector4(0f, 0f, tileNum, 0f));
                     wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, 0f, tileNum, 0f));
+                    wallUVs[rightSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
+                    wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
 
                     for (var i = 0; i < 4; i++) wallUV1s[rightSide.Sector].Add(new Vector4(tw,th,rightSide.XOffset,rightSide.YOffset));
                 }
@@ -78,10 +95,10 @@ namespace UnityWAD
                     var tileNum = WallTiles.LookupTable[rightSide.UpperTexture].TileNum;
                     var tw = WallTiles.LookupTable[rightSide.UpperTexture].Width;
                     var th = WallTiles.LookupTable[rightSide.UpperTexture].Height;
-                    wallUVs[rightSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
-                    wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
                     wallUVs[rightSide.Sector].Add(new Vector4(0f, 0f, tileNum, 0f));
                     wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, 0f, tileNum, 0f));
+                    wallUVs[rightSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
+                    wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
 
                     for (var i = 0; i < 4; i++) wallUV1s[rightSide.Sector].Add(new Vector4(tw, th, rightSide.XOffset, rightSide.YOffset));
                 }
@@ -97,10 +114,10 @@ namespace UnityWAD
                     var tileNum = WallTiles.LookupTable[rightSide.LowerTexture].TileNum;
                     var tw = WallTiles.LookupTable[rightSide.LowerTexture].Width;
                     var th = WallTiles.LookupTable[rightSide.LowerTexture].Height;
-                    wallUVs[rightSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
-                    wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
                     wallUVs[rightSide.Sector].Add(new Vector4(0f, 0f, tileNum, 0f));
                     wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, 0f, tileNum, 0f));
+                    wallUVs[rightSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
+                    wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
 
                     for (var i = 0; i < 4; i++) wallUV1s[rightSide.Sector].Add(new Vector4(tw, th, rightSide.XOffset, rightSide.YOffset));
                 }
@@ -119,10 +136,10 @@ namespace UnityWAD
                         var tileNum = WallTiles.LookupTable[leftSide.FullTexture].TileNum;
                         var tw = WallTiles.LookupTable[leftSide.FullTexture].Width;
                         var th = WallTiles.LookupTable[leftSide.FullTexture].Height;
-                        wallUVs[leftSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
-                        wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
                         wallUVs[leftSide.Sector].Add(new Vector4(0f, 0f, tileNum, 0f));
                         wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, 0f, tileNum, 0f));
+                        wallUVs[leftSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
+                        wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
 
                         for (var i = 0; i < 4; i++) wallUV1s[leftSide.Sector].Add(new Vector4(tw, th, leftSide.XOffset, leftSide.YOffset));
                     }
@@ -138,10 +155,10 @@ namespace UnityWAD
                         var tileNum = WallTiles.LookupTable[leftSide.UpperTexture].TileNum;
                         var tw = WallTiles.LookupTable[leftSide.UpperTexture].Width;
                         var th = WallTiles.LookupTable[leftSide.UpperTexture].Height;
-                        wallUVs[leftSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
-                        wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
                         wallUVs[leftSide.Sector].Add(new Vector4(0f, 0f, tileNum, 0f));
                         wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, 0f, tileNum, 0f));
+                        wallUVs[leftSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
+                        wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
 
                         for (var i = 0; i < 4; i++) wallUV1s[leftSide.Sector].Add(new Vector4(tw, th, leftSide.XOffset, leftSide.YOffset));
 
@@ -158,10 +175,10 @@ namespace UnityWAD
                         var tileNum = WallTiles.LookupTable[leftSide.LowerTexture].TileNum;
                         var tw = WallTiles.LookupTable[leftSide.LowerTexture].Width;
                         var th = WallTiles.LookupTable[leftSide.LowerTexture].Height;
-                        wallUVs[leftSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
-                        wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
                         wallUVs[leftSide.Sector].Add(new Vector4(0f, 0f, tileNum, 0f));
                         wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, 0f, tileNum, 0f));
+                        wallUVs[leftSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
+                        wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
 
                         for (var i = 0; i < 4; i++) wallUV1s[leftSide.Sector].Add(new Vector4(tw, th, leftSide.XOffset, leftSide.YOffset));
 
@@ -169,159 +186,166 @@ namespace UnityWAD
                 }
             }
 
-            for (var i = 0; i < Data.Sectors.Length; i++)
+            for (var sectorNum = 0; sectorNum < Data.Sectors.Length; sectorNum++)
             {
-                var sectorContainer = InstantiateChild(transform, "Sector " + i);
+                var sectorContainer = InstantiateChild(transform, "Sector " + sectorNum);
+
+                var brightness = (byte)Data.Sectors[sectorNum].Brightness;
 
                 var wallsMesh = new Mesh
                 {
-                    vertices = wallVertices[i].ToArray(),
+                    vertices = wallVertices[sectorNum].ToArray(),
                 };
-                wallsMesh.SetIndices(wallIndices[i].ToArray(), MeshTopology.Triangles, 0);
-                wallsMesh.SetUVs(0, wallUVs[i]);
-                wallsMesh.SetUVs(1, wallUV1s[i]);
+                wallsMesh.SetIndices(wallIndices[sectorNum].ToArray(), MeshTopology.Triangles, 0);
+                wallsMesh.SetUVs(0, wallUVs[sectorNum]);
+                wallsMesh.SetUVs(1, wallUV1s[sectorNum]);
                 wallsMesh.RecalculateNormals();
                 wallsMesh.RecalculateBounds();
 
                 var walls = InstantiateChild(sectorContainer.transform, "Walls");
                 walls.GetComponent<MeshFilter>().mesh = wallsMesh;
-                walls.GetComponent<MeshRenderer>().materials = new[] { WallsMaterial };
+                var wm = Instantiate(WallsMaterial);
+                wm.SetColor("_Color", new Color32(brightness, brightness, brightness, 255));
+                walls.GetComponent<MeshRenderer>().materials = new[] { wm };
+
+                // We don't have enough points to create floor/ceiling
+                if (sectorLines[sectorNum].Count < 3) continue;
+
+                // Get the sector outline for calculating vertices and floor & ceiling
+                var sectorVertIndexList = new List<int>();
+                var currentLine = sectorLines[sectorNum][0];
+                bool workingFrom = true;
+                while (true)
+                {
+                    //if (sectorNum == 47)
+                    //{
+                    //    Debug.Log("Need=" + (workingFrom ? currentLine.To : currentLine.From));
+                    //    foreach (var sl in sectorLines[sectorNum])
+                    //    {
+                    //        Debug.Log((sl==currentLine&&workingFrom?"*":"") + "F:" + sl.From + "(" + Data.Vertexes[sl.From].ToString() + ") T:" + sl.To + "(" + Data.Vertexes[sl.To].ToString() + ")"+ (sl == currentLine && !workingFrom ? "*" : ""));
+                    //    }
+                    //}
+
+                    if (workingFrom)
+                    {
+                        if (!sectorVertIndexList.Contains(currentLine.From))
+                            sectorVertIndexList.Add(currentLine.From);
+                        else break;
+                    }
+                    else
+                    {
+                        if (!sectorVertIndexList.Contains(currentLine.To))
+                            sectorVertIndexList.Add(currentLine.To);
+                        else break;
+                    }
+
+                    //if (sectorNum == 47)
+                    //{
+                    //    Debug.Log(sectorVertIndexList.Count);
+                    //    foreach (var sl in sectorVertIndexList)
+                    //    {
+
+                    //        Debug.Log(Data.Vertexes[sl].ToString());
+                    //    }
+                    //}
+
+                    sectorLines[sectorNum].Remove(currentLine);
+
+                    bool found = false;
+                    for (int l = 0; l < sectorLines[sectorNum].Count; l++)
+                    {
+                        if ((workingFrom && (sectorLines[sectorNum][l].From == currentLine.To || sectorLines[sectorNum][l].To == currentLine.To)) || (!workingFrom && (sectorLines[sectorNum][l].From == currentLine.From || sectorLines[sectorNum][l].To == currentLine.From)))
+                        {
+                            found = true;
+                            if (workingFrom)
+                                workingFrom = sectorLines[sectorNum][l].From == currentLine.To;
+                            else
+                                workingFrom = !(sectorLines[sectorNum][l].To == currentLine.From);
+                            currentLine = sectorLines[sectorNum][l];
+                            break;
+                        }
+                    }
+                    if (!found) break;
+
+                    
+                }
+                if (sectorNum == 47)
+                        Debug.Log(sectorVertIndexList.Count);
+
+                if (sectorNum == 47)
+                    foreach (var sl in sectorVertIndexList)
+                    {
+                        Debug.Log(Data.Vertexes[sl].ToString());
+                    }
+
+                var verts2D = new Vector2[sectorVertIndexList.Count];
+                for (var v = 0; v < sectorVertIndexList.Count; v++)
+                    verts2D[v] = new Vector2(Data.Vertexes[sectorVertIndexList[v]].X, Data.Vertexes[sectorVertIndexList[v]].Y);
+
+                // See if we have a tile for the floor and ceiling textures
+                var floorTileNum = -1;
+                if (FlatTiles.LookupTable.ContainsKey(Data.Sectors[sectorNum].FloorTexture.Replace("\0",""))) floorTileNum = FlatTiles.LookupTable[Data.Sectors[sectorNum].FloorTexture.Replace("\0", "")].TileNum;
+                var ceilingTileNum = -1;
+                if (FlatTiles.LookupTable.ContainsKey(Data.Sectors[sectorNum].CeilingTexture.Replace("\0",""))) ceilingTileNum = FlatTiles.LookupTable[Data.Sectors[sectorNum].CeilingTexture.Replace("\0", "")].TileNum;
+
+                // We don't want to render geometry with sky texture
+                if (Data.Sectors[sectorNum].FloorTexture.StartsWith("F_SKY")) floorTileNum = -1;
+                if (Data.Sectors[sectorNum].CeilingTexture.StartsWith("F_SKY")) ceilingTileNum = -1;
+
+                // Triangulate floor
+                int[] floorIndices;
+                Vector2[] floorVerts;
+                Triangulator.Triangulator.Triangulate(verts2D, WindingOrder.Clockwise, out floorVerts, out floorIndices);
+
+                // Triangulate ceiling (reverse winding)
+                int[] ceilIndices;
+                Vector2[] ceilVerts;
+                Triangulator.Triangulator.Triangulate(verts2D, WindingOrder.CounterClockwise, out ceilVerts, out ceilIndices);
+
+                // Pack floor and ceiling into one mesh
+                // But we only want to render if we have a texture tile, so exclude indices if we don't
+                var totalInds = (floorTileNum != -1 ? floorIndices.Length : 0) + (ceilingTileNum != -1 ? ceilIndices.Length : 0);
+                var flatIndices = new int[totalInds];
+                var pos = 0;
+                if (floorTileNum != -1)
+                {
+                    Array.Copy(floorIndices, flatIndices, floorIndices.Length);
+                    pos += floorIndices.Length;
+                }
+                if (ceilingTileNum != -1)
+                {
+                    for (int i = 0; i < ceilIndices.Length; i++) ceilIndices[i] += floorVerts.Length;
+                    Array.Copy(ceilIndices, 0, flatIndices, pos, ceilIndices.Length);
+                }
+
+                Vector3[] flatVertices = new Vector3[floorVerts.Length * 2];
+                Vector4[] flatUVs = new Vector4[floorVerts.Length * 2];
+                
+                for (int i = 0; i < floorVerts.Length; i++)
+                {
+                    flatVertices[i] = new Vector3(floorVerts[i].x*Scale, Data.Sectors[sectorNum].FloorHeight * Scale, floorVerts[i].y*Scale);
+                    flatVertices[i + floorVerts.Length] = new Vector3(ceilVerts[i].x *Scale, Data.Sectors[sectorNum].CeilingHeight * Scale, ceilVerts[i].y*Scale);
+
+                    flatUVs[i] = new Vector4(0, 0, floorTileNum, 0);
+                    flatUVs[i + floorVerts.Length] = new Vector4(0, 0, ceilingTileNum, 0);
+                }
+
+                var flatsMesh = new Mesh
+                {
+                    vertices = flatVertices,
+                };
+                flatsMesh.SetIndices(flatIndices, MeshTopology.Triangles, 0);
+                flatsMesh.SetUVs(0, flatUVs.ToList());
+                flatsMesh.RecalculateNormals();
+                flatsMesh.RecalculateBounds();
+
+                var floor = InstantiateChild(sectorContainer.transform, "Flats");
+                floor.GetComponent<MeshFilter>().mesh = flatsMesh;
+                var fm = Instantiate(FlatsMaterial);
+                fm.SetColor("_Color", new Color32(brightness,brightness,brightness,255));
+                floor.GetComponent<MeshRenderer>().materials = new[] { fm };
             }
-            
         }
-
-        //public void GenerateMesh()
-        //{
-        //    if (Data == null) return;
-
-        //    // We're going to break the map into Sectors, with a child object for each
-        //    // So start by looping through Sectors
-        //    // Note that all the map data is referenced by array index, so we need to loop by index rather than foreaching
-        //    for (var sector = 0; sector < Data.Sectors.Length; sector++)
-        //    {
-        //        var sectorVertIndexList = new List<int>();
-        //        var vertLookup = new Dictionary<int, int>();
-        //        var sectorLines = new List<MapLineDef>();
-
-        //        // Sectors are made up of SideDefs, so we need to loop through sides that belong to this sector
-        //        for (var side = 0; side < Data.SideDefs.Length; side++)
-        //        {
-        //            if (Data.SideDefs[side].Sector == sector)
-        //            {
-        //                // Sides have a corresponding line, so let's get the line for this side
-        //                for (var line = 0; line < Data.LineDefs.Length; line++)
-        //                {
-        //                    if (Data.LineDefs[line].Right == side)
-        //                    {
-        //                        // This side is for the Right side of the line
-        //                        sectorLines.Add(Data.LineDefs[line]);
-                                
-        //                    }
-
-        //                    if (Data.LineDefs[line].Left == side)
-        //                    {
-        //                        //sectorLines.Add(Data.LineDefs[line]);
-        //                        // This side is for the Left side of the line
-        //                    }
-        //                }
-        //            }
-        //        }
-
-        //        if (sectorLines.Count == 0) continue;
-
-        //        // Get the sector outline for calculating vertices and floor & ceiling
-        //        var currentLine = sectorLines[0];
-        //        while (true)
-        //        {
-        //            if (!sectorVertIndexList.Contains(currentLine.From))             
-        //                sectorVertIndexList.Add(currentLine.From);
-        //            else break;
-
-        //            bool found = false;
-        //            for (int i = 0; i < sectorLines.Count; i++)
-        //            {
-        //                if (i!=sectorLines.IndexOf(currentLine) && sectorLines[i].From == currentLine.To)
-        //                {
-        //                    found = true;
-                            
-        //                    currentLine = sectorLines[i];
-        //                    break;
-        //                }
-        //            }
-        //            if (!found) break;
-        //        }
-
-        //        // Get the vertices from the map data and adjust the scale
-        //        // Result in verts2D being a flattened, clockwise-ordered list of verts for our sector
-        //        var verts2D = new Vector2[sectorVertIndexList.Count];
-        //        for(var v =0;v<sectorVertIndexList.Count;v++)
-        //        {
-        //            var vert = new Vector2(Data.Vertexes[sectorVertIndexList[v]].X * Scale, Data.Vertexes[sectorVertIndexList[v]].Y*Scale);
-        //            verts2D[v] = vert;
-
-        //            vertLookup.Add(sectorVertIndexList[v], v);
-        //        }
-
-        //        // We need our verts to be anti-clockwise wound in order to triangulate them
-        //        verts2D = verts2D.Reverse().ToArray();
-
-        //        // Create Unity-space floor and ceiling verts
-        //        Vector3[] vertices = new Vector3[verts2D.Length * 2];
-        //        for (int i = 0; i < verts2D.Length; i++)
-        //        {
-        //            vertices[i] = new Vector3(verts2D[i].x, Data.Sectors[sector].FloorHeight * Scale, verts2D[i].y);
-        //            vertices[i+verts2D.Length]  = new Vector3(verts2D[i].x, Data.Sectors[sector].CeilingHeight * Scale, verts2D[i].y);
-        //        }
-
-        //        // Triangulate floor
-        //        var floorIndices = EarClipper.Triangulate(verts2D).ToArray();
-
-        //        // Triangulate ceiling
-        //        var ceilingIndices = EarClipper.Triangulate(verts2D).Reverse().ToArray();
-        //        for (int i = 0; i < ceilingIndices.Length; i++)
-        //            ceilingIndices[i] += verts2D.Length;
-
-        //        // Triangulate walls
-        //        List<int> wallIndices = new List<int>();
-        //        foreach(var l in sectorLines)
-        //        {
-        //            var right = Data.SideDefs[l.Right];
-        //            var bl = vertLookup[l.From];
-        //            var br = vertLookup[l.To];
-        //            var tl = vertLookup[l.From]+verts2D.Length;
-        //            var tr = vertLookup[l.To]+verts2D.Length;
-        //            wallIndices.AddRange(new[] { tl,bl,br,tl,br,tr });
-
-        //            if (l.Left > -1)
-        //            {
-        //                var left = Data.SideDefs[l.Left];
-        //                bl = vertLookup[l.From];
-        //                br = vertLookup[l.To];
-        //                tl = vertLookup[l.From] + verts2D.Length;
-        //                tr = vertLookup[l.To] + verts2D.Length;
-        //                wallIndices.AddRange(new[] { tr,br,tl,br,bl,tl });
-        //            }
-        //        }
-
-        //        // Set the mesh: Three submeshes make up floor, ceiling, and walls
-        //        var sectorMesh = new Mesh
-        //        {
-        //            subMeshCount = 3,
-        //            vertices = vertices,
-        //        };
-        //        sectorMesh.SetIndices(floorIndices, MeshTopology.Triangles, 0);
-        //        sectorMesh.SetIndices(ceilingIndices, MeshTopology.Triangles, 1);
-        //        sectorMesh.SetIndices(wallIndices.ToArray(), MeshTopology.Triangles, 2);
-
-        //        sectorMesh.RecalculateNormals();
-        //        sectorMesh.RecalculateBounds();
-
-        //        var newSector = InstantiateSector(sector);
-        //        newSector.GetComponent<MeshFilter>().mesh = sectorMesh;
-        //        newSector.GetComponent<MeshRenderer>().materials = new [] { FloorMaterial, CeilingMaterial, WallsMaterial };
-        //    }
-
-        //}
 
         GameObject InstantiateChild(Transform parent, string name)
         {

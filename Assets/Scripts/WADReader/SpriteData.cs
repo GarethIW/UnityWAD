@@ -28,6 +28,7 @@ namespace UnityWAD
         public SpriteData(string name, SpriteType type, int w, int h, int xoff, int yoff, byte[] data)
         {
             Name = name;
+            Type = type;
             Width = w;
             Height = h;
             XOffset = xoff;

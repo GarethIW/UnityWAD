@@ -33,9 +33,9 @@ namespace UnityWAD
                     Name = ReadString(wadStream, entryOffset + 8, 8)
                 };
                 wi.Entries.Add(entry);
-                if (!wi.EntryDictionary.ContainsKey(entry.Name))
+                if (!wi.EntryDictionary.ContainsKey(entry.Name.Replace("\0","")))
                 {
-                    wi.EntryDictionary.Add(entry.Name, entry);
+                    wi.EntryDictionary.Add(entry.Name.Replace("\0",""), entry);
                     //Debug.Log(entry.Name);
                 }
 
@@ -207,6 +207,24 @@ namespace UnityWAD
             
             foreach(var e in spriteEntries)
                 sprites.Add(GetPictureSprite(wadStream,e));
+
+            return sprites;
+        }
+
+        // Get a raw sprite - floors and ceilings mostly
+        public static SpriteData GetRawSprite(FileStream wadStream, WADEntry spriteEntry)
+        {
+            var res = GetResource(wadStream, spriteEntry);
+
+            return new SpriteData(spriteEntry.Name, SpriteType.Raw, 64, 64, 0, 0, res);
+        }
+
+        public static List<SpriteData> GetRawSprites(FileStream wadStream, List<WADEntry> spriteEntries)
+        {
+            var sprites = new List<SpriteData>();
+
+            foreach (var e in spriteEntries)
+                sprites.Add(GetRawSprite(wadStream, e));
 
             return sprites;
         }

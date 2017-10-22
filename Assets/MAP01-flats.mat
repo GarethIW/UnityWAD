@@ -6,8 +6,8 @@ Material:
   m_ObjectHideFlags: 0
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 0}
-  m_Name: MAP01-walls
-  m_Shader: {fileID: 4800000, guid: b5dda9a200caa254da24128eb85c4994, type: 3}
+  m_Name: MAP01-flats
+  m_Shader: {fileID: 4800000, guid: 4cc4830c3f62ba9478ac85f2962ec617, type: 3}
   m_ShaderKeywords: 
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -19,14 +19,15 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _TileMap:
-        m_Texture: {fileID: 2800000, guid: 19716cbeb8cfc0c4391563fa06683dbb, type: 3}
+        m_Texture: {fileID: 2800000, guid: 6b2935e3dbc16ba409a8ee9324a5c1e9, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Floats:
     - _Cutoff: 0.5
-    - _TileHeight: 256
-    - _TileWidth: 256
-    - _XTiles: 8
-    - _YTiles: 8
+    - _Padding: 0
+    - _TileHeight: 64
+    - _TileWidth: 64
+    - _XTiles: 6
+    - _YTiles: 6
     m_Colors:
-    - _Color: {r: 0.5019608, g: 0.5019608, b: 0.5019608, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
