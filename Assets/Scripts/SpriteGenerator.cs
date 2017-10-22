@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEditor.Build;
 using UnityEngine;
@@ -43,7 +44,8 @@ namespace UnityWAD
                             {
                                 // TODO: Colours!
                                 //Debug.Log(spriteData.XOffset + x + "," + ((spriteData.Height - spriteData.YOffset) + row + i) + "=" + (spriteData.XOffset + x + ((((spriteData.Height-1) - spriteData.YOffset) + row + i) * spriteData.Width)) + "/" + textureData.Length);
-                                var xy = (center - spriteData.XOffset) + x + (((spriteData.YOffset) - row - (i-4)) * spriteData.Width);
+                                //var xy = (((-spriteData.Width)/2) + (center + spriteData.XOffset)) + x + ((((spriteData.Height- spriteData.YOffset) + row) + (i-1)) * spriteData.Width);
+                                var xy = x + (((spriteData.Height-1) - (row + i)) * spriteData.Width);
                                 if (xy < textureData.Length && xy >= 0)
                                     textureData[xy] = paletteData.Colors[spriteData.Data[postPos]];
                                 postPos++;
@@ -90,39 +92,51 @@ namespace UnityWAD
             {
                 var sprite = GenerateSprite(patches[patch.PatchName], paletteData);
 
-                if (patch.XOffset >= textureData.Width || patch.YOffset >= textureData.Width ||
-                    patch.XOffset+sprite.width<0 || patch.YOffset+sprite.height<0) continue;
+                byte[] bytes = sprite.EncodeToPNG();
+                var path = Path.Combine(Application.dataPath, textureData.Name.Replace("\0",""));
+                Directory.CreateDirectory(path);
+                path = Path.Combine(path, patch.PatchName + ".png");
+                File.WriteAllBytes(path, bytes);
 
-                var dl = patch.XOffset;
-                var dt = patch.YOffset;
                 var w = sprite.width;
                 var h = sprite.height;
                 var sl = 0;
                 var st = 0;
-               
+
                 if (patch.XOffset < 0)
                 {
-                    dl = 0;
-                    sl = -patch.XOffset;
-                    w = sprite.width + patch.XOffset;
+                    patch.XOffset = 0;
+                    sl -= patch.XOffset;
+                    w += patch.XOffset;
                 }
-                if (dl + w >= textureData.Width)
+                if (patch.XOffset + w > textureData.Width)
                 {
-                    w = textureData.Width - dl;
+                    w = w - ((patch.XOffset+w) - textureData.Width);
                 }
                 if (patch.YOffset < 0)
                 {
-                    dt = 0;
-                    st = -patch.YOffset;
-                    h = sprite.height + patch.YOffset;
+                    patch.YOffset = 0;
+                    st -= patch.YOffset;
+                    h += patch.YOffset;
                 }
-                if (dt + h >= textureData.Height)
+                if (patch.YOffset + h > textureData.Height)
                 {
-                    h = textureData.Height - dt;
+                    h = h - ((patch.YOffset + h) - textureData.Height);
                 }
 
+                var dl = patch.XOffset;
+                var dt = ((textureData.Height) - patch.YOffset) - h;
+                
+
+                //if (patch.XOffset >= textureData.Width || patch.YOffset > textureData.Height ||
+                //    patch.XOffset+sprite.width<0 || patch.YOffset+sprite.height<0) continue;
+
+                
+
+                
+
                 //Debug.Log(patch.XOffset + "," + patch.YOffset + "," + sprite.width + "," + sprite.height + "," + textureData.Width + "," + textureData.Height);
-                //Debug.Log(sl + "," + st + "," + dl +"," + dt + "," + w + "," + h);
+                Debug.Log(textureData.Name + "," + sl + "," + st + "," + dl +"," + dt + "," + w + "," + h);
                 var data = sprite.GetPixels(sl,st,w,h);
                 spriteTexture.SetPixels(dl,dt,w,h,data);
                 //for (int x = dl; x < dl + w; x++)
@@ -132,6 +146,10 @@ namespace UnityWAD
             }
 
             spriteTexture.Apply();
+
+            var finalpath = Path.Combine(Application.dataPath, textureData.Name.Replace("\0", ""));
+            finalpath = Path.Combine(finalpath, textureData.Name.Replace("\0", "") + "_FINAL.png");
+            File.WriteAllBytes(finalpath, spriteTexture.EncodeToPNG());
 
             return spriteTexture;
         }
