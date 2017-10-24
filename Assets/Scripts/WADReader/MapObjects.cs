@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,7 +13,7 @@ namespace UnityWAD
     {
         public int From;
         public int To;
-        public int Attribute;
+        public BitArray Attribute;
         public int Type;
         public int Trigger;
         public int Right;
@@ -22,7 +23,7 @@ namespace UnityWAD
         {
             From = from;
             To = to;
-            Attribute = attribute;
+            Attribute = new BitArray(BitConverter.GetBytes(attribute));
             Type = type;
             Trigger = trigger;
             Right = right;
