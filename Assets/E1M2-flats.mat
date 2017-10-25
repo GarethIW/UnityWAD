@@ -24,6 +24,8 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Floats:
     - _Cutoff: 0.5
+    - _Gloss: 0
+    - _Metallic: 0
     - _Padding: 0
     - _TileHeight: 64
     - _TileWidth: 64

@@ -250,6 +250,9 @@ namespace UnityWAD
                 // We don't have enough points to create a flat for this sector
                 if (sectorLines[sectorNum].Count < 3) continue;
 
+                // Get a copy of lines where the left side is this sector (we'll use this later for cutting holes)
+                
+
                 // Get the sector outline for calculating vertices for the flats
                 // We're going to loop through all the walls that belong to this sector and attempt to join them up
                 // Kind of like Join the Dots, but we need to do it so the vertices are ordered (so we can wind them correctly for triangulation)
@@ -336,6 +339,74 @@ namespace UnityWAD
                 // We don't want to render geometry with sky texture (we want to see through to a potential skybox)
                 if (Data.Sectors[sectorNum].FloorTexture.StartsWith("F_SKY")) floorTileNum = -1;
                 if (Data.Sectors[sectorNum].CeilingTexture.StartsWith("F_SKY")) ceilingTileNum = -1;
+
+                // Use our left line list created earlier to cut holes in our flats
+                var sectorLeftLines = Data.LineDefs.Where(l => l.Left != -1 && Data.SideDefs[l.Left].Sector == sectorNum).ToList();
+
+                var holes = new List<List<int>>();
+
+                var currentHole = 0;
+                if (sectorLeftLines.Count > 3)
+                {
+                    while (true)
+                    {
+                        if (sectorLeftLines.Count < 4) break;
+
+                        holes.Add(new List<int>());
+
+                        currentLine = sectorLeftLines[0];
+                        workingFrom = true;
+                        while (true)
+                        {
+                            if (workingFrom)
+                            {
+                                if (!holes[currentHole].Contains(currentLine.From))
+                                    holes[currentHole].Add(currentLine.From);
+                                else break;
+                            }
+                            else
+                            {
+                                if (!holes[currentHole].Contains(currentLine.To))
+                                    holes[currentHole].Add(currentLine.To);
+                                else break;
+                            }
+
+                            sectorLeftLines.Remove(currentLine);
+
+                            bool found = false;
+                            for (int l = 0; l < sectorLeftLines.Count; l++)
+                            {
+                                if ((workingFrom && (sectorLeftLines[l].From == currentLine.To || sectorLeftLines[l].To == currentLine.To)) || (!workingFrom && (sectorLeftLines[l].From == currentLine.From || sectorLeftLines[l].To == currentLine.From)))
+                                {
+                                    found = true;
+                                    if (workingFrom)
+                                        workingFrom = sectorLeftLines[l].From == currentLine.To;
+                                    else
+                                        workingFrom = !(sectorLeftLines[l].To == currentLine.From);
+                                    currentLine = sectorLeftLines[l];
+                                    break;
+                                }
+                            }
+                            if (!found) break;
+                        }
+
+                        currentHole++;
+                    }
+                }
+
+                foreach(var h in holes)
+                {
+                    var holeVerts2D = new Vector2[h.Count];
+                    for (var v = 0; v < h.Count; v++)
+                    {
+                        holeVerts2D[v] = new Vector2(Data.Vertexes[h[v]].X, Data.Vertexes[h[v]].Y);
+                    }
+
+
+                    //verts2D = Triangulator.Triangulator.CutHoleInShape(verts2D, holeVerts2D);
+
+                    break;
+                }
 
                 // Triangulate floor
                 int[] floorIndices;
