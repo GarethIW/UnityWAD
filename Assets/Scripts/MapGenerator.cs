@@ -40,7 +40,6 @@ namespace UnityWAD
 
             var sectorLines = new Dictionary<int, List<MapLineDef>>();
 
-
             for (var i = 0; i < Data.Sectors.Length; i++)
             {
                 wallVertices.Add(i, new VertexList());
@@ -215,6 +214,9 @@ namespace UnityWAD
                 }
             }
 
+            
+
+
             // Done with walls, now let's start on the floors and ceilings (unofficial Doom docs call them "flats", so we'll do the same)
             // Note that we don't have any data in the WAD file for this, because flats were rendered by raycast
             // So we need to construct our own polys by concave hull triangulation
@@ -250,29 +252,19 @@ namespace UnityWAD
                 // We don't have enough points to create a flat for this sector
                 if (sectorLines[sectorNum].Count < 3) continue;
 
-                // Get a copy of lines where the left side is this sector (we'll use this later for cutting holes)
-                
+                //// Get a copy of lines where the left side is this sector (we'll use this later for cutting holes)
 
-                // Get the sector outline for calculating vertices for the flats
-                // We're going to loop through all the walls that belong to this sector and attempt to join them up
-                // Kind of like Join the Dots, but we need to do it so the vertices are ordered (so we can wind them correctly for triangulation)
-                // So we start on the first line, then find a line where either end connects to the end of that line. And repeat.
-                // Add the connecting vertex of each line to a (hopefully) ordered and closed-loop list
+
+                //// Get the sector outline for calculating vertices for the flats
+                //// We're going to loop through all the walls that belong to this sector and attempt to join them up
+                //// Kind of like Join the Dots, but we need to do it so the vertices are ordered (so we can wind them correctly for triangulation)
+                //// So we start on the first line, then find a line where either end connects to the end of that line. And repeat.
+                //// Add the connecting vertex of each line to a (hopefully) ordered and closed-loop list
                 var sectorVertIndexList = new List<int>();
                 var currentLine = sectorLines[sectorNum][0];
                 bool workingFrom = true;
                 while (true)
                 {
-                    // Some debug output
-                    //if (sectorNum == 47)
-                    //{
-                    //    Debug.Log("Need=" + (workingFrom ? currentLine.To : currentLine.From));
-                    //    foreach (var sl in sectorLines[sectorNum])
-                    //    {
-                    //        Debug.Log((sl==currentLine&&workingFrom?"*":"") + "F:" + sl.From + "(" + Data.Vertexes[sl.From].ToString() + ") T:" + sl.To + "(" + Data.Vertexes[sl.To].ToString() + ")"+ (sl == currentLine && !workingFrom ? "*" : ""));
-                    //    }
-                    //}
-
                     if (workingFrom)
                     {
                         if (!sectorVertIndexList.Contains(currentLine.From))
@@ -286,16 +278,6 @@ namespace UnityWAD
                         else break;
                     }
 
-                    //if (sectorNum == 47)
-                    //{
-                    //    Debug.Log(sectorVertIndexList.Count);
-                    //    foreach (var sl in sectorVertIndexList)
-                    //    {
-
-                    //        Debug.Log(Data.Vertexes[sl].ToString());
-                    //    }
-                    //}
-
                     sectorLines[sectorNum].Remove(currentLine);
 
                     bool found = false;
@@ -307,24 +289,16 @@ namespace UnityWAD
                             if (workingFrom)
                                 workingFrom = sectorLines[sectorNum][l].From == currentLine.To;
                             else
-                                workingFrom = !(sectorLines[sectorNum][l].To == currentLine.From);
+                                workingFrom = sectorLines[sectorNum][l].To != currentLine.From;
                             currentLine = sectorLines[sectorNum][l];
                             break;
                         }
                     }
                     if (!found) break;
 
-                    
+
                 }
-                //if (sectorNum == 47)
-                //        Debug.Log(sectorVertIndexList.Count);
-
-                //if (sectorNum == 47)
-                //    foreach (var sl in sectorVertIndexList)
-                //    {
-                //        Debug.Log(Data.Vertexes[sl].ToString());
-                //    }
-
+              
                 // We have our vertex list, but they're currently just pointers to the vertex index in the map data, so let's actually get the V2s
                 var verts2D = new Vector2[sectorVertIndexList.Count];
                 for (var v = 0; v < sectorVertIndexList.Count; v++)
@@ -332,15 +306,15 @@ namespace UnityWAD
 
                 // See if we have a tile index for the flat textures
                 var floorTileNum = -1;
-                if (FlatTiles.LookupTable.ContainsKey(Data.Sectors[sectorNum].FloorTexture.Replace("\0",""))) floorTileNum = FlatTiles.LookupTable[Data.Sectors[sectorNum].FloorTexture.Replace("\0", "")].TileNum;
+                if (FlatTiles.LookupTable.ContainsKey(Data.Sectors[sectorNum].FloorTexture.Replace("\0", ""))) floorTileNum = FlatTiles.LookupTable[Data.Sectors[sectorNum].FloorTexture.Replace("\0", "")].TileNum;
                 var ceilingTileNum = -1;
-                if (FlatTiles.LookupTable.ContainsKey(Data.Sectors[sectorNum].CeilingTexture.Replace("\0",""))) ceilingTileNum = FlatTiles.LookupTable[Data.Sectors[sectorNum].CeilingTexture.Replace("\0", "")].TileNum;
+                if (FlatTiles.LookupTable.ContainsKey(Data.Sectors[sectorNum].CeilingTexture.Replace("\0", ""))) ceilingTileNum = FlatTiles.LookupTable[Data.Sectors[sectorNum].CeilingTexture.Replace("\0", "")].TileNum;
 
                 // We don't want to render geometry with sky texture (we want to see through to a potential skybox)
                 if (Data.Sectors[sectorNum].FloorTexture.StartsWith("F_SKY")) floorTileNum = -1;
                 if (Data.Sectors[sectorNum].CeilingTexture.StartsWith("F_SKY")) ceilingTileNum = -1;
 
-                // Use our left line list created earlier to cut holes in our flats
+                // Use left-side lines to cut holes in our flats
                 var sectorLeftLines = Data.LineDefs.Where(l => l.Left != -1 && Data.SideDefs[l.Left].Sector == sectorNum).ToList();
 
                 var holes = new List<List<int>>();
@@ -382,7 +356,7 @@ namespace UnityWAD
                                     if (workingFrom)
                                         workingFrom = sectorLeftLines[l].From == currentLine.To;
                                     else
-                                        workingFrom = !(sectorLeftLines[l].To == currentLine.From);
+                                        workingFrom = sectorLeftLines[l].To != currentLine.From;
                                     currentLine = sectorLeftLines[l];
                                     break;
                                 }
@@ -394,7 +368,10 @@ namespace UnityWAD
                     }
                 }
 
-                foreach(var h in holes)
+                
+
+
+                foreach (var h in holes)
                 {
                     var holeVerts2D = new Vector2[h.Count];
                     for (var v = 0; v < h.Count; v++)
@@ -402,10 +379,9 @@ namespace UnityWAD
                         holeVerts2D[v] = new Vector2(Data.Vertexes[h[v]].X, Data.Vertexes[h[v]].Y);
                     }
 
-
-                    //verts2D = Triangulator.Triangulator.CutHoleInShape(verts2D, holeVerts2D);
-
-                    break;
+                    //Cutting holes currently not working (based on a simple test of E1M1 sectors 0 and 1)
+                    // TODO: Check that all the verts fall inside the sector, not on the edges
+                   // verts2D = Triangulator.Triangulator.CutHoleInShape(verts2D, holeVerts2D.Reverse().ToArray());
                 }
 
                 // Triangulate floor
@@ -438,8 +414,8 @@ namespace UnityWAD
                 Vector4[] flatUVs = new Vector4[floorVerts.Length * 2];
                 for (int i = 0; i < floorVerts.Length; i++)
                 {
-                    flatVertices[i] = new Vector3(floorVerts[i].x*Scale, Data.Sectors[sectorNum].FloorHeight * Scale, floorVerts[i].y*Scale);
-                    flatVertices[i + floorVerts.Length] = new Vector3(ceilVerts[i].x *Scale, Data.Sectors[sectorNum].CeilingHeight * Scale, ceilVerts[i].y*Scale);
+                    flatVertices[i] = new Vector3(floorVerts[i].x * Scale, Data.Sectors[sectorNum].FloorHeight * Scale, floorVerts[i].y * Scale);
+                    flatVertices[i + floorVerts.Length] = new Vector3(ceilVerts[i].x * Scale, Data.Sectors[sectorNum].CeilingHeight * Scale, ceilVerts[i].y * Scale);
 
                     flatUVs[i] = new Vector4(0, 0, floorTileNum, 0);
                     flatUVs[i + floorVerts.Length] = new Vector4(0, 0, ceilingTileNum, 0);
@@ -457,7 +433,7 @@ namespace UnityWAD
                 var floor = InstantiateChild(sectorContainer.transform, "Flats");
                 floor.GetComponent<MeshFilter>().mesh = flatsMesh;
                 var fm = Instantiate(FlatsMaterial);
-                fm.SetColor("_Color", new Color32(brightness,brightness,brightness,255));
+                fm.SetColor("_Color", new Color32(brightness, brightness, brightness, 255));
                 floor.GetComponent<MeshRenderer>().materials = new[] { fm };
             }
         }

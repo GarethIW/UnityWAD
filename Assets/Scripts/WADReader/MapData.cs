@@ -11,12 +11,14 @@ namespace UnityWAD
         public MapLineDef[] LineDefs;
         public MapSideDef[] SideDefs;
         public MapSector[] Sectors;
+        public MapSubSector[] SubSectors;
+        public MapSeg[] Segs;
         public MapVertex[] Vertexes;
 
         public List<WallTextureData> WallsUsed = new List<WallTextureData>();
         public List<WADEntry> FlatsUsed = new List<WADEntry>();
 
-        public MapData(WADInfo wadInfo, string name, byte[] things, byte[] lineDefData, byte[] sideDefData, byte[] sectorData, byte[] vertexData)
+        public MapData(WADInfo wadInfo, string name, byte[] things, byte[] lineDefData, byte[] sideDefData, byte[] sectorData, byte[] subSectorData, byte[] segData, byte[] vertexData)
         {
             Name = name;
 
@@ -25,6 +27,8 @@ namespace UnityWAD
             SideDefs = new MapSideDef[sideDefData.Length / 30];
             Sectors = new MapSector[sectorData.Length / 26];
             Vertexes = new MapVertex[vertexData.Length / 4];
+            SubSectors = new MapSubSector[subSectorData.Length / 4];
+            Segs = new MapSeg[segData.Length / 12];
 
             var pos = 0;
             for (var i = 0; i < LineDefs.Length; i++)
@@ -67,13 +71,34 @@ namespace UnityWAD
                                            BitConverter.ToInt16(sectorData, pos + 22),
                                            BitConverter.ToInt16(sectorData, pos + 24));
 
-                //Debug.Log(Sectors[i].CeilingTexture);
                 var cname = Sectors[i].CeilingTexture.Replace("\0", "");
                 if (Sectors[i].CeilingTexture!="-" && wadInfo.EntryDictionary.ContainsKey(cname) && !FlatsUsed.Contains(wadInfo.EntryDictionary[cname])) FlatsUsed.Add(wadInfo.EntryDictionary[cname]);
                 var fname = Sectors[i].FloorTexture.Replace("\0", "");
                 if (Sectors[i].FloorTexture!= "-" && wadInfo.EntryDictionary.ContainsKey(fname) && !FlatsUsed.Contains(wadInfo.EntryDictionary[fname])) FlatsUsed.Add(wadInfo.EntryDictionary[fname]);
 
                 pos += 26;
+            }
+
+            pos = 0;
+            for (var i = 0; i < SubSectors.Length; i++)
+            {
+                SubSectors[i] = new MapSubSector(BitConverter.ToInt16(subSectorData, pos), 
+                                                 BitConverter.ToInt16(subSectorData, pos+2));
+
+                pos += 4;
+            }
+
+            pos = 0;
+            for (var i = 0; i < Segs.Length; i++)
+            {
+                Segs[i] = new MapSeg(BitConverter.ToInt16(segData, pos), 
+                                     BitConverter.ToInt16(segData, pos + 2),
+                                     BitConverter.ToInt16(segData, pos + 4),
+                                     BitConverter.ToInt16(segData, pos + 6),
+                                     BitConverter.ToInt16(segData, pos + 8),
+                                     BitConverter.ToInt16(segData, pos + 10));
+
+                pos += 12;
             }
 
             pos = 0;

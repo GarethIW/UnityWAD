@@ -50,6 +50,8 @@ namespace UnityWAD
         public WADEntry SideDefs;
         public WADEntry Vertexes;
         public WADEntry Sectors;
+        public WADEntry SubSectors;
+        public WADEntry Segs;
         // There are other parts to a map, but these mainly deal with partitioning and collision, we're not worried about that in 2017
 
         public override string ToString()

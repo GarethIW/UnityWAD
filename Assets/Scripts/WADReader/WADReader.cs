@@ -130,6 +130,8 @@ namespace UnityWAD
                         case "SIDEDEFS": map.SideDefs = wadInfo.Entries[index]; break;
                         case "VERTEXES": map.Vertexes = wadInfo.Entries[index]; break;
                         case "SECTORS": map.Sectors = wadInfo.Entries[index]; break;
+                        case "SSECTORS": map.SubSectors = wadInfo.Entries[index]; break;
+                        case "SEGS": map.Segs = wadInfo.Entries[index]; break;
                     }
 
                     index++;
@@ -170,7 +172,9 @@ namespace UnityWAD
                                       GetResource(wadStream, mapEntry.Things),
                                       GetResource(wadStream, mapEntry.LineDefs), 
                                       GetResource(wadStream, mapEntry.SideDefs), 
-                                      GetResource(wadStream, mapEntry.Sectors), 
+                                      GetResource(wadStream, mapEntry.Sectors),
+                                      GetResource(wadStream, mapEntry.SubSectors),
+                                      GetResource(wadStream, mapEntry.Segs),
                                       GetResource(wadStream, mapEntry.Vertexes));
 
             return mapData;

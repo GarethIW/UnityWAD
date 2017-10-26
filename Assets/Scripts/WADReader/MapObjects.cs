@@ -73,6 +73,38 @@ namespace UnityWAD
         }
     }
 
+    public class MapSubSector
+    {
+        public int NumSegs;
+        public int FirstSeg;
+
+        public MapSubSector(int numsegs, int firstseg)
+        {
+            NumSegs = numsegs;
+            FirstSeg = firstseg;
+        }
+    }
+
+    public class MapSeg
+    {
+        public int From;
+        public int To;
+        public int Angle;
+        public int LineDef;
+        public int Side;
+        public int Offset;
+
+        public MapSeg(int from, int to, int angle, int line, int side, int offset)
+        {
+            From = from;
+            To = to;
+            Angle = angle;
+            LineDef = line;
+            Side = side;
+            Offset = offset;
+        }
+    }
+
     public class MapVertex
     {
         public int X;

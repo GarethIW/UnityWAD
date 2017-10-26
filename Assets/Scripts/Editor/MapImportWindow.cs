@@ -21,8 +21,8 @@ namespace UnityWAD
         private WADInfo loadedWad = null;
         List<WADMapEntry> availableMaps = new List<WADMapEntry>();
 
-        //private string fileName = "C:/Users/gareth.MYCRMGROUP/Documents/Github/UnityWAD/DOOM.wad";
-        private string fileName = "G:/Code/UnityWAD/doom.wad";
+        private string fileName = "C:/Users/gareth.MYCRMGROUP/Documents/Github/UnityWAD/DOOM.wad";
+        //private string fileName = "G:/Code/UnityWAD/doom.wad";
         private int mapIndex;
 
         public void Init()

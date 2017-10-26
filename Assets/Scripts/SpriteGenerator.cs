@@ -83,6 +83,9 @@ namespace UnityWAD
         public static Texture2D GenerateWallTexture(WallTextureData textureData, Dictionary<string, SpriteData> patches, PaletteData paletteData)
         {
             Texture2D spriteTexture = new Texture2D(textureData.Width, textureData.Height, TextureFormat.ARGB32, true);
+            
+            // Make it all alpha=0 to start with
+            spriteTexture.SetPixels(new Color[textureData.Width * textureData.Height]);
 
             foreach (var patch in textureData.Patches)
             {
@@ -118,9 +121,11 @@ namespace UnityWAD
                 var dt = ((textureData.Height) - patch.YOffset) - h;
                 
 
-                Debug.Log(textureData.Name + "," + sl + "," + st + "," + dl +"," + dt + "," + w + "," + h);
                 var data = sprite.GetPixels(sl,st,w,h);
-                spriteTexture.SetPixels(dl,dt,w,h,data);
+                // We need to do this per-pixel so we can do alpha cutout
+                for(var x=0;x<w;x++)
+                    for(var y=0;y<h;y++)
+                        if(data[x+(y*w)].a>0) spriteTexture.SetPixel(dl+x,dt+y,data[x + (y * w)]);
             }
 
             spriteTexture.Apply();
@@ -142,13 +147,14 @@ namespace UnityWAD
             var largest = widest > tallest ? widest : tallest;
 
             var rowCount = Mathf.CeilToInt(Mathf.Sqrt(textureList.Count));
+
+            if (rowCount % 2 != 0) rowCount++;
+
             var w = rowCount * largest;
             var h = rowCount * largest;
 
             w += rowCount * padding * 2;
             h += rowCount * padding * 2;
-
-            if (rowCount % 2 != 0) rowCount++;
 
             var spriteSheet = new TileSheet();
             spriteSheet.Rows = rowCount;
@@ -166,6 +172,7 @@ namespace UnityWAD
                 var destX = (largest + padding*2) * (index % rowCount) + padding;
                 var destY = (largest + padding*2) * (index / rowCount) + padding;
 
+                //Debug.Log(t.Name);
                 var source = tex.GetPixels();
                 spriteSheet.Texture.SetPixels(destX, destY, tex.width, tex.height, source);
 
