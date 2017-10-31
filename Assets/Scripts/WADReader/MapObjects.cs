@@ -9,21 +9,39 @@ namespace UnityWAD
     // Structs to hold map data
     // As defined by: https://github.com/nukeop/TheUnofficialDoomSpecs/blob/master/Chapter4.md
 
+    public class MapThing
+    {
+        public int X;
+        public int Y;
+        public int FaceDirection;
+        public int Type;
+        public BitArray Attributes;
+
+        public MapThing(int x, int y, int face, int type, int attributes)
+        {
+            X = x;
+            Y = y;
+            FaceDirection = face;
+            Type = type;
+            Attributes = new BitArray(BitConverter.GetBytes(attributes));
+        }
+    }
+
     public class MapLineDef
     {
         public int From;
         public int To;
-        public BitArray Attribute;
+        public BitArray Attributes;
         public int Type;
         public int Trigger;
         public int Right;
         public int Left;
 
-        public MapLineDef(int from, int to, int attribute, int type, int trigger, int right, int left)
+        public MapLineDef(int from, int to, int attributes, int type, int trigger, int right, int left)
         {
             From = from;
             To = to;
-            Attribute = new BitArray(BitConverter.GetBytes(attribute));
+            Attributes = new BitArray(BitConverter.GetBytes(attributes));
             Type = type;
             Trigger = trigger;
             Right = right;

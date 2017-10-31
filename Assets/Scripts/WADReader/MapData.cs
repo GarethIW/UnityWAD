@@ -8,6 +8,7 @@ namespace UnityWAD
     public class MapData
     {
         public string Name;
+        public MapThing[] Things;
         public MapLineDef[] LineDefs;
         public MapSideDef[] SideDefs;
         public MapSector[] Sectors;
@@ -18,11 +19,11 @@ namespace UnityWAD
         public List<WallTextureData> WallsUsed = new List<WallTextureData>();
         public List<WADEntry> FlatsUsed = new List<WADEntry>();
 
-        public MapData(WADInfo wadInfo, string name, byte[] things, byte[] lineDefData, byte[] sideDefData, byte[] sectorData, byte[] subSectorData, byte[] segData, byte[] vertexData)
+        public MapData(WADInfo wadInfo, string name, byte[] thingsData, byte[] lineDefData, byte[] sideDefData, byte[] sectorData, byte[] subSectorData, byte[] segData, byte[] vertexData)
         {
             Name = name;
 
-            //TODO : Things
+            Things = new MapThing[thingsData.Length/10];
             LineDefs = new MapLineDef[lineDefData.Length / 14];
             SideDefs = new MapSideDef[sideDefData.Length / 30];
             Sectors = new MapSector[sectorData.Length / 26];
@@ -31,6 +32,17 @@ namespace UnityWAD
             Segs = new MapSeg[segData.Length / 12];
 
             var pos = 0;
+            for (var i = 0; i < Things.Length; i++)
+            {
+                Things[i] = new MapThing(BitConverter.ToInt16(thingsData, pos),
+                    BitConverter.ToInt16(thingsData, pos + 2),
+                    BitConverter.ToInt16(thingsData, pos + 4),
+                    BitConverter.ToInt16(thingsData, pos + 6),
+                    BitConverter.ToInt16(thingsData, pos + 8));
+                pos += 10;
+            }
+
+            pos = 0;
             for (var i = 0; i < LineDefs.Length; i++)
             {
                 LineDefs[i] = new MapLineDef(BitConverter.ToInt16(lineDefData, pos),

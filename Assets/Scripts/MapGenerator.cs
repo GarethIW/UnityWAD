@@ -13,7 +13,7 @@ namespace UnityWAD
         public MapData Data;
         public Vector2 Grid = new Vector2(64f,64f); // Line length of one map grid unit, used to calculate uv scaling
 
-        public float Scale = 0.015625f;
+        public float Scale = 2f;
 
         public TileSheet WallTiles;
         public TileSheet FlatTiles;
@@ -30,7 +30,7 @@ namespace UnityWAD
             if (Data == null) return;
 
             // Scale to the Doom grid size. 64x64 pixel grid gives us the correct scale for 1 Unity unit
-            Scale = 1f / Grid.x;
+            var localScale = (1f / Grid.x) * Scale;
 
             // Dictionaries of lists. We're building by sector so we'll index by sector
             var wallVertices = new Dictionary<int,VertexList>();    // Vertices are per-face because we're tilemapping so we can't share them
@@ -76,10 +76,10 @@ namespace UnityWAD
                 // A "-" means no texture, so we don't render that side of the wall
                 if (!rightSide.FullTexture.StartsWith("-"))
                 {
-                    var tl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.CeilingHeight, Data.Vertexes[line.From].Y) * Scale);
-                    var tr = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.CeilingHeight, Data.Vertexes[line.To].Y) * Scale);
-                    var bl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.FloorHeight, Data.Vertexes[line.From].Y) * Scale);
-                    var br = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.FloorHeight, Data.Vertexes[line.To].Y) * Scale);
+                    var tl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.CeilingHeight, Data.Vertexes[line.From].Y) * localScale);
+                    var tr = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.CeilingHeight, Data.Vertexes[line.To].Y) * localScale);
+                    var bl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.FloorHeight, Data.Vertexes[line.From].Y) * localScale);
+                    var br = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.FloorHeight, Data.Vertexes[line.To].Y) * localScale);
                     wallIndices[rightSide.Sector].AddRange(new[] { tr,br,tl,br,bl,tl });
 
                     var heightRatio = (1f / Grid.y) * (rightSector.CeilingHeight - rightSector.FloorHeight);
@@ -101,10 +101,10 @@ namespace UnityWAD
                     var heightRatio = (1f / Grid.y) * (rightSector.CeilingHeight - leftSector.CeilingHeight);
                     if (heightRatio > 0f)
                     {
-                        var tl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.CeilingHeight, Data.Vertexes[line.From].Y) * Scale);
-                        var tr = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.CeilingHeight, Data.Vertexes[line.To].Y) * Scale);
-                        var bl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.CeilingHeight, Data.Vertexes[line.From].Y) * Scale);
-                        var br = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.CeilingHeight, Data.Vertexes[line.To].Y) * Scale);
+                        var tl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.CeilingHeight, Data.Vertexes[line.From].Y) * localScale);
+                        var tr = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.CeilingHeight, Data.Vertexes[line.To].Y) * localScale);
+                        var bl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.CeilingHeight, Data.Vertexes[line.From].Y) * localScale);
+                        var br = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.CeilingHeight, Data.Vertexes[line.To].Y) * localScale);
                         wallIndices[rightSide.Sector].AddRange(new[] { tr, br, tl, br, bl, tl });
 
                         var tileNum = WallTiles.LookupTable[rightSide.UpperTexture].TileNum;
@@ -126,10 +126,10 @@ namespace UnityWAD
                     var heightRatio = (1f / Grid.y) * (leftSector.FloorHeight - rightSector.FloorHeight);
                     if (heightRatio > 0f)
                     {
-                        var tl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.FloorHeight, Data.Vertexes[line.From].Y) * Scale);
-                        var tr = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.FloorHeight, Data.Vertexes[line.To].Y) * Scale);
-                        var bl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.FloorHeight, Data.Vertexes[line.From].Y) * Scale);
-                        var br = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.FloorHeight, Data.Vertexes[line.To].Y) * Scale);
+                        var tl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.FloorHeight, Data.Vertexes[line.From].Y) * localScale);
+                        var tr = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.FloorHeight, Data.Vertexes[line.To].Y) * localScale);
+                        var bl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.FloorHeight, Data.Vertexes[line.From].Y) * localScale);
+                        var br = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.FloorHeight, Data.Vertexes[line.To].Y) * localScale);
                         wallIndices[rightSide.Sector].AddRange(new[] { tr, br, tl, br, bl, tl });
 
                         var tileNum = WallTiles.LookupTable[rightSide.LowerTexture].TileNum;
@@ -149,10 +149,10 @@ namespace UnityWAD
                 {
                     if (!leftSide.FullTexture.StartsWith("-"))
                     {
-                        var tl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.CeilingHeight, Data.Vertexes[line.From].Y) * Scale);
-                        var tr = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.CeilingHeight, Data.Vertexes[line.To].Y) * Scale);
-                        var bl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.FloorHeight, Data.Vertexes[line.From].Y) * Scale);
-                        var br = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.FloorHeight, Data.Vertexes[line.To].Y) * Scale);
+                        var tl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.CeilingHeight, Data.Vertexes[line.From].Y) * localScale);
+                        var tr = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.CeilingHeight, Data.Vertexes[line.To].Y) * localScale);
+                        var bl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.FloorHeight, Data.Vertexes[line.From].Y) * localScale);
+                        var br = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.FloorHeight, Data.Vertexes[line.To].Y) * localScale);
                         wallIndices[leftSide.Sector].AddRange(new[] { tl, bl, br, tl, br, tr });
 
                         var heightRatio = (1f / Grid.y) * (leftSector.CeilingHeight - leftSector.FloorHeight);
@@ -171,10 +171,10 @@ namespace UnityWAD
                         var heightRatio = (1f / Grid.y) * (leftSector.CeilingHeight - rightSector.CeilingHeight);
                         if (heightRatio > 0f)
                         {
-                            var tl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.CeilingHeight, Data.Vertexes[line.From].Y) * Scale);
-                            var tr = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.CeilingHeight, Data.Vertexes[line.To].Y) * Scale);
-                            var bl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.CeilingHeight, Data.Vertexes[line.From].Y) * Scale);
-                            var br = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.CeilingHeight, Data.Vertexes[line.To].Y) * Scale);
+                            var tl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.CeilingHeight, Data.Vertexes[line.From].Y) * localScale);
+                            var tr = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.CeilingHeight, Data.Vertexes[line.To].Y) * localScale);
+                            var bl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.CeilingHeight, Data.Vertexes[line.From].Y) * localScale);
+                            var br = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.CeilingHeight, Data.Vertexes[line.To].Y) * localScale);
                             wallIndices[leftSide.Sector].AddRange(new[] { tl, bl, br, tl, br, tr });
 
                             var tileNum = WallTiles.LookupTable[leftSide.UpperTexture].TileNum;
@@ -194,10 +194,10 @@ namespace UnityWAD
                         var heightRatio = (1f / Grid.y) * (rightSector.FloorHeight - leftSector.FloorHeight);
                         if (heightRatio > 0f)
                         {
-                            var tl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.FloorHeight, Data.Vertexes[line.From].Y) * Scale);
-                            var tr = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.FloorHeight, Data.Vertexes[line.To].Y) * Scale);
-                            var bl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.FloorHeight, Data.Vertexes[line.From].Y) * Scale);
-                            var br = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.FloorHeight, Data.Vertexes[line.To].Y) * Scale);
+                            var tl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.FloorHeight, Data.Vertexes[line.From].Y) * localScale);
+                            var tr = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.FloorHeight, Data.Vertexes[line.To].Y) * localScale);
+                            var bl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.FloorHeight, Data.Vertexes[line.From].Y) * localScale);
+                            var br = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.FloorHeight, Data.Vertexes[line.To].Y) * localScale);
                             wallIndices[leftSide.Sector].AddRange(new[] { tl, bl, br, tl, br, tr });
 
                             var tileNum = WallTiles.LookupTable[leftSide.LowerTexture].TileNum;
@@ -414,8 +414,8 @@ namespace UnityWAD
                 Vector4[] flatUVs = new Vector4[floorVerts.Length * 2];
                 for (int i = 0; i < floorVerts.Length; i++)
                 {
-                    flatVertices[i] = new Vector3(floorVerts[i].x * Scale, Data.Sectors[sectorNum].FloorHeight * Scale, floorVerts[i].y * Scale);
-                    flatVertices[i + floorVerts.Length] = new Vector3(ceilVerts[i].x * Scale, Data.Sectors[sectorNum].CeilingHeight * Scale, ceilVerts[i].y * Scale);
+                    flatVertices[i] = new Vector3(floorVerts[i].x * localScale, Data.Sectors[sectorNum].FloorHeight * localScale, floorVerts[i].y * localScale);
+                    flatVertices[i + floorVerts.Length] = new Vector3(ceilVerts[i].x * localScale, Data.Sectors[sectorNum].CeilingHeight * localScale, ceilVerts[i].y * localScale);
 
                     flatUVs[i] = new Vector4(0, 0, floorTileNum, 0);
                     flatUVs[i + floorVerts.Length] = new Vector4(0, 0, ceilingTileNum, 0);

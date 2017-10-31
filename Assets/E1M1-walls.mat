@@ -31,5 +31,6 @@ Material:
     - _TileWidth: 256
     - _XTiles: 6
     - _YTiles: 6
+    - _node_3730: 0
     m_Colors:
     - _Color: {r: 0.5019608, g: 0.5019608, b: 0.5019608, a: 1}

@@ -54,7 +54,7 @@ namespace UnityWAD
                 pos += 8;
             }
 
-            // Wall textures
+            // Wall textures: textures listed in the TEXTURE1 resource are for shareware (Episode 1) maps, all others are in TEXTURE2.
             var texEntry = wi.EntryDictionary["TEXTURE1"];
             var texList = GetTextures(wadStream, wi, GetResource(wadStream, texEntry));
             foreach(var t in texList)
@@ -73,6 +73,7 @@ namespace UnityWAD
             return wi;
         }
 
+        // Get all the wall textures from the wall texture resource
         public static List<WallTextureData> GetTextures(FileStream wadStream, WADInfo wadInfo, byte[] data)
         {
             var textures = new List<WallTextureData>();
@@ -143,6 +144,7 @@ namespace UnityWAD
             return maps;
         }
 
+        // Get a single resource from the WAD file
         public static byte[] GetResource(FileStream wadStream, WADEntry entry)
         {
             wadStream.Seek(entry.ResourceOffset, SeekOrigin.Begin);
@@ -153,6 +155,7 @@ namespace UnityWAD
             return bytes;
         }
 
+        // Get a dictionary of resources based on a list of WADEntries
         public static Dictionary<string, byte[]> GetResources(FileStream wadStream, List<WADEntry> entries)
         {
             var resDict = new Dictionary<string, byte[]>();
@@ -162,8 +165,6 @@ namespace UnityWAD
 
             return resDict;
         }
-
-       
 
         // Returns actual map data when given a map entry (from GetMapList)
         public static MapData GetMapData(FileStream wadStream, WADInfo wadInfo, WADMapEntry mapEntry)
@@ -180,8 +181,7 @@ namespace UnityWAD
             return mapData;
         }
 
-        
-
+        // Get a palette from the WAD, by the palette index number
         public static PaletteData GetPalette(FileStream wadStream, int paletteNum)
         {
             var wadInfo = GetInfo(wadStream);
@@ -205,6 +205,7 @@ namespace UnityWAD
             return new SpriteData(spriteEntry.Name, SpriteType.Picture, BitConverter.ToInt16(res,0), BitConverter.ToInt16(res, 2), BitConverter.ToInt16(res, 4), BitConverter.ToInt16(res, 6), res);
         }
 
+        // Get a list of sprites based on a list of entries
         public static List<SpriteData> GetPictureSprites(FileStream wadStream, List<WADEntry> spriteEntries)
         {
             var sprites = new List<SpriteData>();
@@ -223,6 +224,7 @@ namespace UnityWAD
             return new SpriteData(spriteEntry.Name, SpriteType.Raw, 64, 64, 0, 0, res);
         }
 
+        // Get a list of raw sprites based on a list of entries
         public static List<SpriteData> GetRawSprites(FileStream wadStream, List<WADEntry> spriteEntries)
         {
             var sprites = new List<SpriteData>();
@@ -233,6 +235,7 @@ namespace UnityWAD
             return sprites;
         }
 
+        // Get a dictionary of wall patches based on the patch names listed in the wall texture data
         public static Dictionary<string, SpriteData> GetWallPatches(FileStream wadStream, WADInfo wadInfo, WallTextureData textureData)
         {
             var sprites = new Dictionary<string, SpriteData>();
