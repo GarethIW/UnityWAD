@@ -335,29 +335,23 @@ namespace Triangulator
 		/// <returns>The calculated winding order of the polygon.</returns>
 		public static WindingOrder DetermineWindingOrder(Vector2[] vertices)
 		{
-			int clockWiseCount = 0;
-			int counterClockWiseCount = 0;
-			Vector2 p1 = vertices[0];
-
-			for (int i = 1; i < vertices.Length; i++)
+			// Use the signed area (shoelace formula) rather than a per-vertex convex/reflex
+			// vote. The old vote counted every collinear turn (cross product == 0) as
+			// clockwise, so polygons with many collinear vertices - which DOOM geometry is
+			// full of, e.g. a long straight wall split by intermediate vertices - had their
+			// winding misdetected. That flipped convex/reflex classification and produced
+			// zero-area or overlapping triangulations. Signed area is immune: collinear
+			// points contribute exactly zero and only genuine corners affect the sign.
+			double area = 0.0;
+			for (int i = 0; i < vertices.Length; i++)
 			{
-				Vector2 p2 = vertices[i];
-				Vector2 p3 = vertices[(i + 1) % vertices.Length];
-
-				Vector2 e1 = p1 - p2;
-				Vector2 e2 = p3 - p2;
-
-				if (e1.x * e2.y - e1.y * e2.x >= 0)
-					clockWiseCount++;
-				else
-					counterClockWiseCount++;
-
-				p1 = p2;
+				Vector2 cur = vertices[i];
+				Vector2 next = vertices[(i + 1) % vertices.Length];
+				area += (double)cur.x * next.y - (double)next.x * cur.y;
 			}
 
-			return (clockWiseCount > counterClockWiseCount)
-				? WindingOrder.Clockwise
-				: WindingOrder.CounterClockwise;
+			// Positive signed area == counter-clockwise in a standard (Y-up) coordinate system.
+			return area < 0.0 ? WindingOrder.Clockwise : WindingOrder.CounterClockwise;
 		}
 
 		#endregion

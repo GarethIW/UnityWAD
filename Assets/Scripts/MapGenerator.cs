@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityWAD;
-using Triangulator;
 
 namespace UnityWAD
 {
@@ -38,18 +37,129 @@ namespace UnityWAD
             var wallUV1s = new Dictionary<int, List<Vector4>>();    // UV1: (tile width,tile height (dimensions of wall sprite *within* the tile indexed in uv0),X offset,Y offset (offsets as defined in SideDefs))
             var wallIndices = new Dictionary<int, List<int>>();
 
-            var sectorLines = new Dictionary<int, List<MapLineDef>>();
-
             for (var i = 0; i < Data.Sectors.Length; i++)
             {
                 wallVertices.Add(i, new VertexList());
                 wallUVs.Add(i, new List<Vector4>());
                 wallUV1s.Add(i, new List<Vector4>());
                 wallIndices.Add(i, new List<int>());
+            }
 
-                // A list to hold all the lines that belong to this sector
-                // i.e. any lines where the left or right sidedef sector equals the sector being examined
-                sectorLines.Add(i, new List<MapLineDef>());
+            // Classify which sectors are doors/lifts so their geometry can be pulled out of the
+            // static mesh into their own movable GameObjects (see the finalisation pass below).
+            var movingSectors = Movers.ResolveMovingSectors(Data);
+            bool Separated(MoverKind k) => k == MoverKind.Door || k == MoverKind.LockedDoor || k == MoverKind.Lift;
+
+            // Per-mover-sector accumulators. "Face" geometry is wall-type (a door's face / a lift's
+            // side skin, DoomWalls material); "Cap" geometry is flat-type (a door's underside ceiling
+            // / a lift's floor, DoomFlats material).
+            var moverFaceV = new Dictionary<int, VertexList>();
+            var moverFaceUV0 = new Dictionary<int, List<Vector4>>();
+            var moverFaceUV1 = new Dictionary<int, List<Vector4>>();
+            var moverFaceI = new Dictionary<int, List<int>>();
+            var moverCapV = new Dictionary<int, List<Vector3>>();
+            var moverCapUV = new Dictionary<int, List<Vector4>>();
+            var moverCapI = new Dictionary<int, List<int>>();
+            void EnsureMover(int s)
+            {
+                if (moverFaceV.ContainsKey(s)) return;
+                moverFaceV[s] = new VertexList(); moverFaceUV0[s] = new List<Vector4>();
+                moverFaceUV1[s] = new List<Vector4>(); moverFaceI[s] = new List<int>();
+                moverCapV[s] = new List<Vector3>(); moverCapUV[s] = new List<Vector4>();
+                moverCapI[s] = new List<int>();
+            }
+
+            // Emits one wall quad (four per-face vertices) with DOOM-accurate texel UVs into the
+            // supplied target lists.
+            //   uv0 = (horizontalTexel, verticalTexel, tileIndex, 0)  - absolute DOOM texels
+            //   uv1 = (textureWidth, textureHeight, 0, 0)             - source size within the atlas cell
+            // Horizontal texels run from the anchor vertex (v1 for front sides, v2 for back sides)
+            // plus the sidedef X offset. Vertical texels are pegged per the DOOM rules:
+            //   pegRefIsTop  -> the texture's TOP edge sits at pegRefZ
+            //   !pegRefIsTop -> the texture's BOTTOM edge sits at pegRefZ
+            // with the sidedef Y offset added on top. The shader tiles with frac(), so these are
+            // absolute (un-wrapped) texel coordinates - which is what makes stacked wall sections
+            // line up exactly as they do in DOOM.
+            void AddWallSection(VertexList vl, List<Vector4> uv0, List<Vector4> uv1, List<int> inds,
+                                Vector2 from2D, Vector2 to2D, float topZ, float botZ,
+                                string texName, int xOff, int yOff, float pegRefZ, bool pegRefIsTop, bool frontSide)
+            {
+                if (!WallTiles.LookupTable.ContainsKey(texName)) return; // texture not in atlas -> skip
+                var tile = WallTiles.LookupTable[texName];
+                int tileNum = tile.TileNum;
+                float tw = tile.Width, th = tile.Height;
+
+                float wallLen = Vector2.Distance(from2D, to2D);
+                float tuFrom = frontSide ? xOff : xOff + wallLen;
+                float tuTo = frontSide ? xOff + wallLen : xOff;
+
+                // World Z of the texture's bottom edge (texel 0), then vertical texels up from it.
+                float pegBottomZ = (pegRefIsTop ? pegRefZ - th : pegRefZ) + yOff;
+                float tvTop = topZ - pegBottomZ;
+                float tvBot = botZ - pegBottomZ;
+
+                int tl = vl.Add(new Vector3(from2D.x, topZ, from2D.y) * localScale);
+                int tr = vl.Add(new Vector3(to2D.x, topZ, to2D.y) * localScale);
+                int bl = vl.Add(new Vector3(from2D.x, botZ, from2D.y) * localScale);
+                int br = vl.Add(new Vector3(to2D.x, botZ, to2D.y) * localScale);
+
+                if (frontSide) inds.AddRange(new[] { tr, br, tl, br, bl, tl });
+                else inds.AddRange(new[] { tl, bl, br, tl, br, tr });
+
+                uv0.Add(new Vector4(tuFrom, tvTop, tileNum, 0f));
+                uv0.Add(new Vector4(tuTo, tvTop, tileNum, 0f));
+                uv0.Add(new Vector4(tuFrom, tvBot, tileNum, 0f));
+                uv0.Add(new Vector4(tuTo, tvBot, tileNum, 0f));
+                for (int i = 0; i < 4; i++) uv1.Add(new Vector4(tw, th, 0f, 0f));
+            }
+
+            // Appends a floor/ceiling surface (triangulated flat) into the supplied lists at the
+            // given height. faceUp reverses the winding so a floor's normal points up (+Y).
+            void AddFlatSurface(List<Vector3> verts, List<Vector4> uvs, List<int> inds,
+                                FlatGeometry.SectorFlat flat, float height, int tileNum, bool faceUp)
+            {
+                if (tileNum == -1) return;
+                foreach (var region in flat.Regions)
+                {
+                    int b = verts.Count;
+                    foreach (var p in region.Verts)
+                    {
+                        verts.Add(new Vector3(p.x, height, p.y) * localScale);
+                        uvs.Add(new Vector4(0, 0, tileNum, 0));
+                    }
+                    for (int i = 0; i < region.Tris.Length; i += 3)
+                    {
+                        if (faceUp) { inds.Add(b + region.Tris[i + 2]); inds.Add(b + region.Tris[i + 1]); inds.Add(b + region.Tris[i]); }
+                        else { inds.Add(b + region.Tris[i]); inds.Add(b + region.Tris[i + 1]); inds.Add(b + region.Tris[i + 2]); }
+                    }
+                }
+            }
+
+            // Routes a wall face to the static sector mesh - or, when it is the skin of an adjacent
+            // door (an upper wall) or lift (a lower wall), into that mover's own geometry so it can
+            // be separated out and moved.
+            void EmitWall(int ownSector, int neighbourSector, char part, Vector2 from2D, Vector2 to2D,
+                          float topZ, float botZ, string tex, int xOff, int yOff, float pegRef,
+                          bool pegRefIsTop, bool frontSide)
+            {
+                int moverS = -1;
+                if (neighbourSector >= 0 && movingSectors.TryGetValue(neighbourSector, out var nk))
+                {
+                    if (part == 'U' && (nk == MoverKind.Door || nk == MoverKind.LockedDoor)) moverS = neighbourSector;
+                    else if (part == 'L' && nk == MoverKind.Lift) moverS = neighbourSector;
+                }
+
+                if (moverS >= 0)
+                {
+                    EnsureMover(moverS);
+                    AddWallSection(moverFaceV[moverS], moverFaceUV0[moverS], moverFaceUV1[moverS], moverFaceI[moverS],
+                                   from2D, to2D, topZ, botZ, tex, xOff, yOff, pegRef, pegRefIsTop, frontSide);
+                }
+                else
+                {
+                    AddWallSection(wallVertices[ownSector], wallUVs[ownSector], wallUV1s[ownSector], wallIndices[ownSector],
+                                   from2D, to2D, topZ, botZ, tex, xOff, yOff, pegRef, pegRefIsTop, frontSide);
+                }
             }
 
             // Generate some walls!
@@ -63,158 +173,91 @@ namespace UnityWAD
                 var rightSector = Data.Sectors[rightSide.Sector];
                 var leftSector = leftSide!=null ? Data.Sectors[leftSide.Sector] : null;
 
-                sectorLines[rightSide.Sector].Add(line);
-                if(leftSide!=null)
-                    sectorLines[leftSide.Sector].Add(line);
- 
+                int rightNeighbour = leftSide != null ? leftSide.Sector : -1;
+                int leftNeighbour = rightSide.Sector;
 
-                // Calculate the ratio of the lines's length to the Doom grid size (64x64). We use this to set the UVs so that wall textures can be tiled instead of stretching
-                var widthRatio = (1f/Grid.x) * Vector2.Distance(new Vector2(Data.Vertexes[line.From].X, Data.Vertexes[line.From].Y), new Vector2(Data.Vertexes[line.To].X, Data.Vertexes[line.To].Y));
+                var from2D = new Vector2(Data.Vertexes[line.From].X, Data.Vertexes[line.From].Y);
+                var to2D = new Vector2(Data.Vertexes[line.To].X, Data.Vertexes[line.To].Y);
 
-                // Full-height walls stretch from the sector's ceiling height (top) to the sector's floor height (bottom)
-                // Start with right-side walls
-                // A "-" means no texture, so we don't render that side of the wall
+                // DOOM linedef flags: bit 3 = upper unpegged (ML_DONTPEGTOP),
+                // bit 4 = lower unpegged (ML_DONTPEGBOTTOM). These pick where each wall texture is
+                // pegged vertically and were previously ignored entirely - the single biggest reason
+                // wall textures never matched DOOM.
+                bool pegTop = line.Attributes[3];
+                bool pegBottom = line.Attributes[4];
+
+                // --- Right (front) side ---
+                // Full wall (one-sided line): ceiling down to floor.
                 if (!rightSide.FullTexture.StartsWith("-"))
                 {
-                    var tl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.CeilingHeight, Data.Vertexes[line.From].Y) * localScale);
-                    var tr = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.CeilingHeight, Data.Vertexes[line.To].Y) * localScale);
-                    var bl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.FloorHeight, Data.Vertexes[line.From].Y) * localScale);
-                    var br = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.FloorHeight, Data.Vertexes[line.To].Y) * localScale);
-                    wallIndices[rightSide.Sector].AddRange(new[] { tr,br,tl,br,bl,tl });
-
-                    var heightRatio = (1f / Grid.y) * (rightSector.CeilingHeight - rightSector.FloorHeight);
-                    var tileNum = WallTiles.LookupTable[rightSide.FullTexture].TileNum;
-                    var tw = WallTiles.LookupTable[rightSide.FullTexture].Width;
-                    var th = WallTiles.LookupTable[rightSide.FullTexture].Height;
-                    wallUVs[rightSide.Sector].Add(new Vector4(0f, 0f, tileNum, 0f));
-                    wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, 0f, tileNum, 0f));
-                    wallUVs[rightSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
-                    wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
-
-                    for (var i = 0; i < 4; i++) wallUV1s[rightSide.Sector].Add(new Vector4(tw,th,rightSide.XOffset,rightSide.YOffset));
+                    float topZ = rightSector.CeilingHeight, botZ = rightSector.FloorHeight;
+                    // Middle texture: default pegs the top to the ceiling; lower-unpegged pegs the
+                    // bottom to the floor.
+                    float pegRef = pegBottom ? botZ : topZ;
+                    EmitWall(rightSide.Sector, rightNeighbour, 'F', from2D, to2D, topZ, botZ, rightSide.FullTexture,
+                             rightSide.XOffset, rightSide.YOffset, pegRef, !pegBottom, true);
                 }
-
-                // Upper walls stretch from this sector's ceiling height (top) to the neighbouring (left side) sector's ceiling height (bottom)
-                if (!rightSide.UpperTexture.StartsWith("-") && leftSector!=null && !(leftSector.CeilingTexture.StartsWith("F_SKY")))
+                // Upper wall: this ceiling down to the neighbour's (lower) ceiling.
+                if (!rightSide.UpperTexture.StartsWith("-") && leftSector != null && !leftSector.CeilingTexture.StartsWith("F_SKY"))
                 {
-                    // Dont draw walls with a zero or negative height
-                    var heightRatio = (1f / Grid.y) * (rightSector.CeilingHeight - leftSector.CeilingHeight);
-                    if (heightRatio > 0f)
+                    float topZ = rightSector.CeilingHeight, botZ = leftSector.CeilingHeight;
+                    if (topZ - botZ > 0f)
                     {
-                        var tl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.CeilingHeight, Data.Vertexes[line.From].Y) * localScale);
-                        var tr = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.CeilingHeight, Data.Vertexes[line.To].Y) * localScale);
-                        var bl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.CeilingHeight, Data.Vertexes[line.From].Y) * localScale);
-                        var br = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.CeilingHeight, Data.Vertexes[line.To].Y) * localScale);
-                        wallIndices[rightSide.Sector].AddRange(new[] { tr, br, tl, br, bl, tl });
-
-                        var tileNum = WallTiles.LookupTable[rightSide.UpperTexture].TileNum;
-                        var tw = WallTiles.LookupTable[rightSide.UpperTexture].Width;
-                        var th = WallTiles.LookupTable[rightSide.UpperTexture].Height;
-                        wallUVs[rightSide.Sector].Add(new Vector4(0f, 0f, tileNum, 0f));
-                        wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, 0f, tileNum, 0f));
-                        wallUVs[rightSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
-                        wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
-
-                        for (var i = 0; i < 4; i++) wallUV1s[rightSide.Sector].Add(new Vector4(tw, th, rightSide.XOffset, rightSide.YOffset));
+                        // Default pegs the bottom to the back ceiling; upper-unpegged pegs the top
+                        // to this ceiling.
+                        float pegRef = pegTop ? topZ : botZ;
+                        EmitWall(rightSide.Sector, rightNeighbour, 'U', from2D, to2D, topZ, botZ, rightSide.UpperTexture,
+                                 rightSide.XOffset, rightSide.YOffset, pegRef, pegTop, true);
                     }
                 }
-
-                // Lower walls stretch from the neighbouring (left side) sector's floor height (top) to the this sector's floor height (bottom)
+                // Lower wall: neighbour's (higher) floor down to this floor.
                 if (!rightSide.LowerTexture.StartsWith("-") && leftSector != null)
                 {
-                    // Dont draw walls with a zero or negative height
-                    var heightRatio = (1f / Grid.y) * (leftSector.FloorHeight - rightSector.FloorHeight);
-                    if (heightRatio > 0f)
+                    float topZ = leftSector.FloorHeight, botZ = rightSector.FloorHeight;
+                    if (topZ - botZ > 0f)
                     {
-                        var tl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.FloorHeight, Data.Vertexes[line.From].Y) * localScale);
-                        var tr = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.FloorHeight, Data.Vertexes[line.To].Y) * localScale);
-                        var bl = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.FloorHeight, Data.Vertexes[line.From].Y) * localScale);
-                        var br = wallVertices[rightSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.FloorHeight, Data.Vertexes[line.To].Y) * localScale);
-                        wallIndices[rightSide.Sector].AddRange(new[] { tr, br, tl, br, bl, tl });
-
-                        var tileNum = WallTiles.LookupTable[rightSide.LowerTexture].TileNum;
-                        var tw = WallTiles.LookupTable[rightSide.LowerTexture].Width;
-                        var th = WallTiles.LookupTable[rightSide.LowerTexture].Height;
-                        wallUVs[rightSide.Sector].Add(new Vector4(0f, 0f, tileNum, 0f));
-                        wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, 0f, tileNum, 0f));
-                        wallUVs[rightSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
-                        wallUVs[rightSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
-
-                        for (var i = 0; i < 4; i++) wallUV1s[rightSide.Sector].Add(new Vector4(tw, th, rightSide.XOffset, rightSide.YOffset));
+                        // Default pegs the top to the back floor; lower-unpegged pegs the top to
+                        // this sector's ceiling (so it aligns with the wall above, e.g. lifts).
+                        float pegRef = pegBottom ? (float)rightSector.CeilingHeight : topZ;
+                        EmitWall(rightSide.Sector, rightNeighbour, 'L', from2D, to2D, topZ, botZ, rightSide.LowerTexture,
+                                 rightSide.XOffset, rightSide.YOffset, pegRef, true, true);
                     }
                 }
 
-                // Now left-side walls, pretty much the same as above but reversed by sector
+                // --- Left (back) side --- (same rules, sectors swapped, reversed winding)
                 if (leftSide != null)
                 {
                     if (!leftSide.FullTexture.StartsWith("-"))
                     {
-                        var tl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.CeilingHeight, Data.Vertexes[line.From].Y) * localScale);
-                        var tr = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.CeilingHeight, Data.Vertexes[line.To].Y) * localScale);
-                        var bl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.FloorHeight, Data.Vertexes[line.From].Y) * localScale);
-                        var br = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.FloorHeight, Data.Vertexes[line.To].Y) * localScale);
-                        wallIndices[leftSide.Sector].AddRange(new[] { tl, bl, br, tl, br, tr });
-
-                        var heightRatio = (1f / Grid.y) * (leftSector.CeilingHeight - leftSector.FloorHeight);
-                        var tileNum = WallTiles.LookupTable[leftSide.FullTexture].TileNum;
-                        var tw = WallTiles.LookupTable[leftSide.FullTexture].Width;
-                        var th = WallTiles.LookupTable[leftSide.FullTexture].Height;
-                        wallUVs[leftSide.Sector].Add(new Vector4(0f, 0f, tileNum, 0f));
-                        wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, 0f, tileNum, 0f));
-                        wallUVs[leftSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
-                        wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
-
-                        for (var i = 0; i < 4; i++) wallUV1s[leftSide.Sector].Add(new Vector4(tw, th, leftSide.XOffset, leftSide.YOffset));
+                        float topZ = leftSector.CeilingHeight, botZ = leftSector.FloorHeight;
+                        float pegRef = pegBottom ? botZ : topZ;
+                        EmitWall(leftSide.Sector, leftNeighbour, 'F', from2D, to2D, topZ, botZ, leftSide.FullTexture,
+                                 leftSide.XOffset, leftSide.YOffset, pegRef, !pegBottom, false);
                     }
-                    if (!leftSide.UpperTexture.StartsWith("-") && leftSector != null)
+                    if (!leftSide.UpperTexture.StartsWith("-") && !rightSector.CeilingTexture.StartsWith("F_SKY"))
                     {
-                        var heightRatio = (1f / Grid.y) * (leftSector.CeilingHeight - rightSector.CeilingHeight);
-                        if (heightRatio > 0f)
+                        float topZ = leftSector.CeilingHeight, botZ = rightSector.CeilingHeight;
+                        if (topZ - botZ > 0f)
                         {
-                            var tl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.CeilingHeight, Data.Vertexes[line.From].Y) * localScale);
-                            var tr = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.CeilingHeight, Data.Vertexes[line.To].Y) * localScale);
-                            var bl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.CeilingHeight, Data.Vertexes[line.From].Y) * localScale);
-                            var br = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.CeilingHeight, Data.Vertexes[line.To].Y) * localScale);
-                            wallIndices[leftSide.Sector].AddRange(new[] { tl, bl, br, tl, br, tr });
-
-                            var tileNum = WallTiles.LookupTable[leftSide.UpperTexture].TileNum;
-                            var tw = WallTiles.LookupTable[leftSide.UpperTexture].Width;
-                            var th = WallTiles.LookupTable[leftSide.UpperTexture].Height;
-                            wallUVs[leftSide.Sector].Add(new Vector4(0f, 0f, tileNum, 0f));
-                            wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, 0f, tileNum, 0f));
-                            wallUVs[leftSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
-                            wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
-
-                            for (var i = 0; i < 4; i++) wallUV1s[leftSide.Sector].Add(new Vector4(tw, th, leftSide.XOffset, leftSide.YOffset));
+                            float pegRef = pegTop ? topZ : botZ;
+                            EmitWall(leftSide.Sector, leftNeighbour, 'U', from2D, to2D, topZ, botZ, leftSide.UpperTexture,
+                                     leftSide.XOffset, leftSide.YOffset, pegRef, pegTop, false);
                         }
-
                     }
-                    if (!leftSide.LowerTexture.StartsWith("-") && leftSector != null)
+                    if (!leftSide.LowerTexture.StartsWith("-"))
                     {
-                        var heightRatio = (1f / Grid.y) * (rightSector.FloorHeight - leftSector.FloorHeight);
-                        if (heightRatio > 0f)
+                        float topZ = rightSector.FloorHeight, botZ = leftSector.FloorHeight;
+                        if (topZ - botZ > 0f)
                         {
-                            var tl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, rightSector.FloorHeight, Data.Vertexes[line.From].Y) * localScale);
-                            var tr = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, rightSector.FloorHeight, Data.Vertexes[line.To].Y) * localScale);
-                            var bl = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.From].X, leftSector.FloorHeight, Data.Vertexes[line.From].Y) * localScale);
-                            var br = wallVertices[leftSide.Sector].Add(new Vector3(Data.Vertexes[line.To].X, leftSector.FloorHeight, Data.Vertexes[line.To].Y) * localScale);
-                            wallIndices[leftSide.Sector].AddRange(new[] { tl, bl, br, tl, br, tr });
-
-                            var tileNum = WallTiles.LookupTable[leftSide.LowerTexture].TileNum;
-                            var tw = WallTiles.LookupTable[leftSide.LowerTexture].Width;
-                            var th = WallTiles.LookupTable[leftSide.LowerTexture].Height;
-                            wallUVs[leftSide.Sector].Add(new Vector4(0f, 0f, tileNum, 0f));
-                            wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, 0f, tileNum, 0f));
-                            wallUVs[leftSide.Sector].Add(new Vector4(0f, heightRatio, tileNum, 0f));
-                            wallUVs[leftSide.Sector].Add(new Vector4(widthRatio, heightRatio, tileNum, 0f));
-
-                            for (var i = 0; i < 4; i++) wallUV1s[leftSide.Sector].Add(new Vector4(tw, th, leftSide.XOffset, leftSide.YOffset));
+                            float pegRef = pegBottom ? (float)leftSector.CeilingHeight : topZ;
+                            EmitWall(leftSide.Sector, leftNeighbour, 'L', from2D, to2D, topZ, botZ, leftSide.LowerTexture,
+                                     leftSide.XOffset, leftSide.YOffset, pegRef, true, false);
                         }
                     }
                 }
             }
 
-            
+
 
 
             // Done with walls, now let's start on the floors and ceilings (unofficial Doom docs call them "flats", so we'll do the same)
@@ -249,61 +292,6 @@ namespace UnityWAD
 
                 // Now we can start on the flats
 
-                // We don't have enough points to create a flat for this sector
-                if (sectorLines[sectorNum].Count < 3) continue;
-
-                //// Get a copy of lines where the left side is this sector (we'll use this later for cutting holes)
-
-
-                //// Get the sector outline for calculating vertices for the flats
-                //// We're going to loop through all the walls that belong to this sector and attempt to join them up
-                //// Kind of like Join the Dots, but we need to do it so the vertices are ordered (so we can wind them correctly for triangulation)
-                //// So we start on the first line, then find a line where either end connects to the end of that line. And repeat.
-                //// Add the connecting vertex of each line to a (hopefully) ordered and closed-loop list
-                var sectorVertIndexList = new List<int>();
-                var currentLine = sectorLines[sectorNum][0];
-                bool workingFrom = true;
-                while (true)
-                {
-                    if (workingFrom)
-                    {
-                        if (!sectorVertIndexList.Contains(currentLine.From))
-                            sectorVertIndexList.Add(currentLine.From);
-                        else break;
-                    }
-                    else
-                    {
-                        if (!sectorVertIndexList.Contains(currentLine.To))
-                            sectorVertIndexList.Add(currentLine.To);
-                        else break;
-                    }
-
-                    sectorLines[sectorNum].Remove(currentLine);
-
-                    bool found = false;
-                    for (int l = 0; l < sectorLines[sectorNum].Count; l++)
-                    {
-                        if ((workingFrom && (sectorLines[sectorNum][l].From == currentLine.To || sectorLines[sectorNum][l].To == currentLine.To)) || (!workingFrom && (sectorLines[sectorNum][l].From == currentLine.From || sectorLines[sectorNum][l].To == currentLine.From)))
-                        {
-                            found = true;
-                            if (workingFrom)
-                                workingFrom = sectorLines[sectorNum][l].From == currentLine.To;
-                            else
-                                workingFrom = sectorLines[sectorNum][l].To != currentLine.From;
-                            currentLine = sectorLines[sectorNum][l];
-                            break;
-                        }
-                    }
-                    if (!found) break;
-
-
-                }
-              
-                // We have our vertex list, but they're currently just pointers to the vertex index in the map data, so let's actually get the V2s
-                var verts2D = new Vector2[sectorVertIndexList.Count];
-                for (var v = 0; v < sectorVertIndexList.Count; v++)
-                    verts2D[v] = new Vector2(Data.Vertexes[sectorVertIndexList[v]].X, Data.Vertexes[sectorVertIndexList[v]].Y);
-
                 // See if we have a tile index for the flat textures
                 var floorTileNum = -1;
                 if (FlatTiles.LookupTable.ContainsKey(Data.Sectors[sectorNum].FloorTexture.Replace("\0", ""))) floorTileNum = FlatTiles.LookupTable[Data.Sectors[sectorNum].FloorTexture.Replace("\0", "")].TileNum;
@@ -314,127 +302,149 @@ namespace UnityWAD
                 if (Data.Sectors[sectorNum].FloorTexture.StartsWith("F_SKY")) floorTileNum = -1;
                 if (Data.Sectors[sectorNum].CeilingTexture.StartsWith("F_SKY")) ceilingTileNum = -1;
 
-                // Use left-side lines to cut holes in our flats
-                var sectorLeftLines = Data.LineDefs.Where(l => l.Left != -1 && Data.SideDefs[l.Left].Sector == sectorNum).ToList();
+                // Rebuild the floor/ceiling polygons for this sector - tracing the boundary loops,
+                // classifying outer boundaries vs holes (islands), and triangulating with the holes
+                // cut out. See FlatGeometry for the details.
+                var flat = FlatGeometry.Build(Data, sectorNum);
+                if (flat.Outers.Count == 0) continue; // nothing enclosed -> no flat to build
 
-                var holes = new List<List<int>>();
+                var floorH = Data.Sectors[sectorNum].FloorHeight;
+                var ceilH = Data.Sectors[sectorNum].CeilingHeight;
 
-                var currentHole = 0;
-                if (sectorLeftLines.Count > 3)
+                movingSectors.TryGetValue(sectorNum, out var sectorKind);
+                bool sectorIsDoor = sectorKind == MoverKind.Door || sectorKind == MoverKind.LockedDoor;
+                bool sectorIsLift = sectorKind == MoverKind.Lift;
+
+                var flatVertices = new List<Vector3>();
+                var flatUVs = new List<Vector4>();
+                var flatIndices = new List<int>();
+
+                // Floor moves with a lift (its top surface); otherwise it stays in the static mesh.
+                if (sectorIsLift)
                 {
-                    while (true)
+                    EnsureMover(sectorNum);
+                    AddFlatSurface(moverCapV[sectorNum], moverCapUV[sectorNum], moverCapI[sectorNum], flat, floorH, floorTileNum, true);
+                }
+                else
+                {
+                    AddFlatSurface(flatVertices, flatUVs, flatIndices, flat, floorH, floorTileNum, true);
+                }
+
+                // Ceiling moves with a door (its underside); otherwise it stays in the static mesh.
+                if (sectorIsDoor)
+                {
+                    EnsureMover(sectorNum);
+                    AddFlatSurface(moverCapV[sectorNum], moverCapUV[sectorNum], moverCapI[sectorNum], flat, ceilH, ceilingTileNum, false);
+                }
+                else
+                {
+                    AddFlatSurface(flatVertices, flatUVs, flatIndices, flat, ceilH, ceilingTileNum, false);
+                }
+
+                if (flatVertices.Count > 0)
+                {
+                    var flatsMesh = new Mesh();
+                    if (flatVertices.Count > 65000) flatsMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                    flatsMesh.SetVertices(flatVertices);
+                    flatsMesh.SetIndices(flatIndices.ToArray(), MeshTopology.Triangles, 0);
+                    flatsMesh.SetUVs(0, flatUVs);
+                    flatsMesh.RecalculateNormals();
+                    flatsMesh.RecalculateBounds();
+
+                    var floor = InstantiateChild(sectorContainer.transform, "Flats");
+                    floor.GetComponent<MeshFilter>().mesh = flatsMesh;
+                    var fm = Instantiate(FlatsMaterial);
+                    fm.SetColor("_Color", new Color32(brightness, brightness, brightness, 255));
+                    floor.GetComponent<MeshRenderer>().materials = new[] { fm };
+                }
+            }
+
+            // Builds a mesh child (offset so its vertices are local to the mover's pivot) and gives
+            // it the given base material tinted by sector brightness.
+            void BuildMoverChild(Transform parent, string name, List<Vector3> verts, List<Vector4> uv0,
+                                 List<Vector4> uv1, List<int> inds, Vector3 offset, Material baseMat, byte brightness)
+            {
+                var vs = new Vector3[verts.Count];
+                for (int i = 0; i < verts.Count; i++) vs[i] = verts[i] - offset;
+
+                var mesh = new Mesh();
+                if (vs.Length > 65000) mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                mesh.vertices = vs;
+                mesh.SetIndices(inds.ToArray(), MeshTopology.Triangles, 0);
+                mesh.SetUVs(0, uv0);
+                if (uv1 != null) mesh.SetUVs(1, uv1);
+                mesh.RecalculateNormals();
+                mesh.RecalculateBounds();
+
+                var go = InstantiateChild(parent, name);
+                go.GetComponent<MeshFilter>().mesh = mesh;
+                var mat = Instantiate(baseMat);
+                mat.SetColor("_Color", new Color32(brightness, brightness, brightness, 255));
+                go.GetComponent<MeshRenderer>().materials = new[] { mat };
+            }
+
+            // Finalise: build the separated door/lift GameObjects. Each is positioned at its own
+            // pivot (footprint centre, at the sector floor) so it can later be animated simply by
+            // translating its Transform - see DoomMover.OpenOffset. No controller/animation is added.
+            Transform moversRoot = null;
+            foreach (var kv in movingSectors)
+            {
+                int s = kv.Key;
+                var mk = kv.Value;
+                if (!Separated(mk) || !moverFaceV.ContainsKey(s)) continue;
+
+                var faceVerts = moverFaceV[s].Vertices;
+                var capVerts = moverCapV[s];
+                bool hasFace = faceVerts.Count > 0;
+                bool hasCap = capVerts.Count > 0;
+                if (!hasFace && !hasCap) continue;
+
+                float minX = float.MaxValue, maxX = float.MinValue, minZ = float.MaxValue, maxZ = float.MinValue;
+                void Extend(List<Vector3> vs)
+                {
+                    foreach (var v in vs)
                     {
-                        if (sectorLeftLines.Count < 4) break;
-
-                        holes.Add(new List<int>());
-
-                        currentLine = sectorLeftLines[0];
-                        workingFrom = true;
-                        while (true)
-                        {
-                            if (workingFrom)
-                            {
-                                if (!holes[currentHole].Contains(currentLine.From))
-                                    holes[currentHole].Add(currentLine.From);
-                                else break;
-                            }
-                            else
-                            {
-                                if (!holes[currentHole].Contains(currentLine.To))
-                                    holes[currentHole].Add(currentLine.To);
-                                else break;
-                            }
-
-                            sectorLeftLines.Remove(currentLine);
-
-                            bool found = false;
-                            for (int l = 0; l < sectorLeftLines.Count; l++)
-                            {
-                                if ((workingFrom && (sectorLeftLines[l].From == currentLine.To || sectorLeftLines[l].To == currentLine.To)) || (!workingFrom && (sectorLeftLines[l].From == currentLine.From || sectorLeftLines[l].To == currentLine.From)))
-                                {
-                                    found = true;
-                                    if (workingFrom)
-                                        workingFrom = sectorLeftLines[l].From == currentLine.To;
-                                    else
-                                        workingFrom = sectorLeftLines[l].To != currentLine.From;
-                                    currentLine = sectorLeftLines[l];
-                                    break;
-                                }
-                            }
-                            if (!found) break;
-                        }
-
-                        currentHole++;
+                        if (v.x < minX) minX = v.x;
+                        if (v.x > maxX) maxX = v.x;
+                        if (v.z < minZ) minZ = v.z;
+                        if (v.z > maxZ) maxZ = v.z;
                     }
                 }
+                Extend(faceVerts); Extend(capVerts);
+                var pivot = new Vector3((minX + maxX) * 0.5f, Data.Sectors[s].FloorHeight * localScale, (minZ + maxZ) * 0.5f);
 
-                
-
-
-                foreach (var h in holes)
+                if (moversRoot == null)
                 {
-                    var holeVerts2D = new Vector2[h.Count];
-                    for (var v = 0; v < h.Count; v++)
-                    {
-                        holeVerts2D[v] = new Vector2(Data.Vertexes[h[v]].X, Data.Vertexes[h[v]].Y);
-                    }
-
-                    //Cutting holes currently not working (based on a simple test of E1M1 sectors 0 and 1)
-                    // TODO: Check that all the verts fall inside the sector, not on the edges
-                   // verts2D = Triangulator.Triangulator.CutHoleInShape(verts2D, holeVerts2D.Reverse().ToArray());
+                    var rootGO = new GameObject("Movers");
+                    rootGO.transform.SetParent(transform);
+                    rootGO.transform.localPosition = Vector3.zero;
+                    moversRoot = rootGO.transform;
                 }
 
-                // Triangulate floor
-                int[] floorIndices;
-                Vector2[] floorVerts;
-                Triangulator.Triangulator.Triangulate(verts2D, WindingOrder.Clockwise, out floorVerts, out floorIndices);
+                var moverBrightness = (byte)Data.Sectors[s].Brightness;
+                var moverGO = new GameObject((mk == MoverKind.Lift ? "Lift " : "Door ") + s);
+                moverGO.transform.SetParent(moversRoot);
+                moverGO.transform.localPosition = pivot;
 
-                // Triangulate ceiling (reverse winding)
-                int[] ceilIndices;
-                Vector2[] ceilVerts;
-                Triangulator.Triangulator.Triangulate(verts2D, WindingOrder.CounterClockwise, out ceilVerts, out ceilIndices);
+                if (hasFace)
+                    BuildMoverChild(moverGO.transform, "Faces", faceVerts, moverFaceUV0[s], moverFaceUV1[s], moverFaceI[s], pivot, WallsMaterial, moverBrightness);
+                if (hasCap)
+                    BuildMoverChild(moverGO.transform, "Cap", capVerts, moverCapUV[s], null, moverCapI[s], pivot, FlatsMaterial, moverBrightness);
 
-                // Pack floor and ceiling into one mesh
-                // But we only want to render if we have a texture tile, so exclude indices if we don't
-                var totalInds = (floorTileNum != -1 ? floorIndices.Length : 0) + (ceilingTileNum != -1 ? ceilIndices.Length : 0);
-                var flatIndices = new int[totalInds];
-                var pos = 0;
-                if (floorTileNum != -1)
+                var mover = moverGO.AddComponent<DoomMover>();
+                mover.Kind = mk;
+                mover.SectorIndex = s;
+                if (mk == MoverKind.Lift)
                 {
-                    Array.Copy(floorIndices, flatIndices, floorIndices.Length);
-                    pos += floorIndices.Length;
+                    mover.ClosedHeight = Data.Sectors[s].FloorHeight;
+                    mover.OpenHeight = Movers.LowestNeighbourFloor(Data, s, Data.Sectors[s].FloorHeight);
                 }
-                if (ceilingTileNum != -1)
+                else
                 {
-                    for (int i = 0; i < ceilIndices.Length; i++) ceilIndices[i] += floorVerts.Length;
-                    Array.Copy(ceilIndices, 0, flatIndices, pos, ceilIndices.Length);
+                    mover.ClosedHeight = Data.Sectors[s].CeilingHeight;
+                    mover.OpenHeight = Movers.LowestNeighbourCeiling(Data, s, Data.Sectors[s].CeilingHeight) - 4;
                 }
-
-                Vector3[] flatVertices = new Vector3[floorVerts.Length * 2];
-                Vector4[] flatUVs = new Vector4[floorVerts.Length * 2];
-                for (int i = 0; i < floorVerts.Length; i++)
-                {
-                    flatVertices[i] = new Vector3(floorVerts[i].x * localScale, Data.Sectors[sectorNum].FloorHeight * localScale, floorVerts[i].y * localScale);
-                    flatVertices[i + floorVerts.Length] = new Vector3(ceilVerts[i].x * localScale, Data.Sectors[sectorNum].CeilingHeight * localScale, ceilVerts[i].y * localScale);
-
-                    flatUVs[i] = new Vector4(0, 0, floorTileNum, 0);
-                    flatUVs[i + floorVerts.Length] = new Vector4(0, 0, ceilingTileNum, 0);
-                }
-
-                var flatsMesh = new Mesh
-                {
-                    vertices = flatVertices,
-                };
-                flatsMesh.SetIndices(flatIndices, MeshTopology.Triangles, 0);
-                flatsMesh.SetUVs(0, flatUVs.ToList());
-                flatsMesh.RecalculateNormals();
-                flatsMesh.RecalculateBounds();
-
-                var floor = InstantiateChild(sectorContainer.transform, "Flats");
-                floor.GetComponent<MeshFilter>().mesh = flatsMesh;
-                var fm = Instantiate(FlatsMaterial);
-                fm.SetColor("_Color", new Color32(brightness, brightness, brightness, 255));
-                floor.GetComponent<MeshRenderer>().materials = new[] { fm };
+                mover.OpenOffset = new Vector3(0f, (mover.OpenHeight - mover.ClosedHeight) * localScale, 0f);
             }
         }
 

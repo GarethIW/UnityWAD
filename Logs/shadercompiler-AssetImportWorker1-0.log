@@ -1,0 +1,12 @@
+Base path: 'F:/UnityInstalls/6000.3.21f1/Editor/Data', plugins path 'F:/UnityInstalls/6000.3.21f1/Editor/Data/PlaybackEngines', jobs: y
+Cmd: initializeCompiler
+
+Cmd: initializeCompiler
+
+Cmd: initializeCompiler
+
+Cmd: initializeCompiler
+
+Unhandled exception: Protocol error - failed to read magic number. Error code 0x80000004 (Not connected). (transferred 0/4)
+
+Quitting shader compiler process
